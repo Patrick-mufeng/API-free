@@ -27,6 +27,14 @@ const NOTES: Record<string, string[]> = {
     '上游是 Command Code，首次使用要先在「账号」页签完成 OAuth 登录',
     '模型目录随上游同步，数量会变动（点「刷新」看最新）',
   ],
+  zen: [
+    '匿名免费通道：没有账号、没有密钥要填（上游凭据是字面量 public），本服务的密钥只是本机鉴权用',
+    '/v1/models 只列出上游判定为免费的模型；免费判定以 models.dev 的 cost 为准',
+    '上游按出口 IP 限流：429 会把上游原文与 Retry-After 原样返回，换网络节点或稍后再试',
+    '部分模型按地区封锁（403 REGION_BLOCKED），换出口或改用当前地区可用的模型',
+    '带推理的模型默认就在思考：正文为空时看 reasoning_content；要真正停思考需发 reasoning_effort: "none"',
+    '只支持 OpenAI Chat 协议；Muse 系列走 Responses 协议，本服务默认不暴露',
+  ],
 }
 
 const PROTOCOL_LABEL: Record<string, string> = {

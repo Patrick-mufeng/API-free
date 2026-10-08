@@ -1,11 +1,12 @@
 # ============================================================
 #  密钥：一律本地生成，仓库只保留 *.example
-#  下面三个文件里是真实 API key（提交前用「真钥反查全树」验证过：
+#  下面这些文件里是真实 API key（提交前用「真钥反查全树」验证过：
 #  除它们自己之外，另有 panel/data/logs/*.log 也含明文密钥）。
 # ============================================================
 /workbuddy-free-main/config.json
 /Qoder-free-main/config.json
 /cline-free-main/.env.local
+/zen-free-main/config.json
 
 # 通用兜底：任何位置的 env 文件都不入库，但保留 example
 **/.env
@@ -36,6 +37,7 @@ data/
 #  依赖与构建产物（都可由源码重建）
 #  - panel/bin/panel.exe            → go build -o bin/panel.exe ./cmd/panel
 #  - Qoder-free-main/bin/qoder-free.exe → 该项目自己的 go build
+#  - zen-free-main/bin/zen-free.exe → go build -o bin/zen-free.exe ./cmd/server
 #  - panel/ui/dist/                 → cd panel/ui && npm run build
 #  - */node_modules/                → npm install
 # ============================================================
@@ -44,6 +46,7 @@ node_modules/
 /panel/ui/dist/
 /cmdgo-bridge-main/dist/
 /Qoder-free-main/bin/
+/zen-free-main/bin/
 *.exe
 *.exe~
 *.bak

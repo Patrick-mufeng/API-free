@@ -1,4 +1,4 @@
-﻿# API-free 停止：先停四个服务，再关掉面板
+﻿# API-free 停止：先停五个服务，再关掉面板
 # 用法：双击项目根目录的 stop.bat
 $ErrorActionPreference = 'Continue'
 $panelDir = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -8,7 +8,7 @@ $alive = $false
 try { $alive = (Invoke-WebRequest -UseBasicParsing -TimeoutSec 2 "$BASE/api/health").StatusCode -eq 200 } catch { }
 
 if ($alive) {
-    foreach ($svc in 'workbuddy', 'qoder', 'cline', 'cmdgo') {
+    foreach ($svc in 'workbuddy', 'qoder', 'zen', 'cline', 'cmdgo') {
         try {
             Invoke-RestMethod -Method Post -TimeoutSec 30 "$BASE/api/services/$svc/stop" | Out-Null
             Write-Host "      $svc 已停止"

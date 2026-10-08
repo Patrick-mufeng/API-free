@@ -7,9 +7,10 @@ export const SVC_COLOR: Record<string, string> = {
   qoder: '#3d6fd0',
   cline: '#c07427',
   cmdgo: '#cc4b44',
+  zen: '#6b5bd2',
 }
 
-const SVC_ORDER = ['workbuddy', 'qoder', 'cline', 'cmdgo']
+const SVC_ORDER = ['workbuddy', 'qoder', 'zen', 'cline', 'cmdgo']
 
 /** 固定展示顺序：注册表里多出来的服务排在已认识的四个之后。 */
 export function orderIndex(id: string): number {

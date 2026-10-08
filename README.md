@@ -1,18 +1,18 @@
 # API-free
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-2e64f0.svg)](panel/LICENSE)
-![Services](https://img.shields.io/badge/services-Qoder%20%C2%B7%20WorkBuddy%20%C2%B7%20Cline%20%C2%B7%20Command%20Code-555)
+![Services](https://img.shields.io/badge/services-Qoder%20%C2%B7%20WorkBuddy%20%C2%B7%20Cline%20%C2%B7%20Command%20Code%20%C2%B7%20Zen-555)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-555)
 
-把四个「免费额度」AI 反代服务收进一个面板统一管理。
+把五个「免费额度」AI 反代服务收进一个面板统一管理。
 
-Qoder、WorkBuddy、Cline、Command Code 各自都有一个本机反代项目，能把账号池变成 OpenAI 兼容 API。但用起来是四套独立的进程、四个端口、四个风格不同的管理页面。**API-free 不改这四个项目的功能，只在外面加一层统一面板**：一个界面看四个服务的状态、账号和用量，一处启停，一处拿密钥，一处接进各种客户端。
+Qoder、WorkBuddy、Cline、Command Code 各自都有一个本机反代项目，能把账号池变成 OpenAI 兼容 API；Zen-free 是把 OpenCode Zen 的匿名免费通道包成同样形状的服务（它没有账号，也不许要密钥）。但用起来是五套独立的进程、五个端口、五个风格不同的管理页面。**API-free 不改这些项目的功能，只在外面加一层统一面板**：一个界面看五个服务的状态、账号和用量，一处启停，一处拿密钥，一处接进各种客户端。
 
 ![架构](docs/images/00-arch.png)
 
 ## 界面
 
-总览：四张服务卡（状态 / 账号 / 积分 / 模型 / 今日用量 / 30 天迷你趋势）、跨服务用量趋势、时段分布、模型与账号排行、服务质量、面板事件。
+总览：五张服务卡（状态 / 账号 / 积分 / 模型 / 今日用量 / 30 天迷你趋势）、跨服务用量趋势、时段分布、模型与账号排行、服务质量、面板事件。
 
 ![总览](docs/images/01-overview.png)
 
@@ -20,7 +20,7 @@ Qoder、WorkBuddy、Cline、Command Code 各自都有一个本机反代项目，
 
 ![统计](docs/images/02-stats.png)
 
-服务页（每个服务一套页签：账号 / 模型 / 用量 / 日志 / 接入 / 设置）：
+服务页（每个服务一套页签：账号 / 模型 / 用量 / 日志 / 接入 / 设置；zen 没有账号池，页签里也就不摆「账号」）：
 
 ![服务页 · 账号池](docs/images/03-service-workbuddy.png)
 
@@ -44,11 +44,11 @@ cline 的模型库（只有启用过的模型才会出现在 `/v1/models` 里）
 
 | 痛点 | API-free 的做法 |
 |---|---|
-| 四套进程要手动一个个起 | 面板托管：一处启停，崩溃按 30s 指数退避自动拉起 |
-| 四个端口、四套账号池要分别登录 | 统一面板里集中操作；登录流程（设备码 / OAuth）保持一致 |
+| 五套进程要手动一个个起 | 面板托管：一处启停，崩溃按 30s 指数退避自动拉起 |
+| 五个端口、四套账号池要分别登录 | 统一面板里集中操作；登录流程（设备码 / OAuth）保持一致（zen 不需要登录） |
 | 不知道一共花了多少、今天用了多少 | 面板按天聚合各服务用量，落本地 SQLite，跨服务对比 |
-| 想接进客户端时要翻四个项目的文档找密钥 | 每个服务有「接入」页签：地址、密钥（默认脱敏）、五种调用代码、一键自检 |
-| 四个服务的接口字段各不相同 | 面板统一读它们的原生接口，差异在服务端吸收掉 |
+| 想接进客户端时要翻五个项目的文档找密钥 | 每个服务有「接入」页签：地址、密钥（默认脱敏）、五种调用代码、一键自检 |
+| 五个服务的接口字段各不相同 | 面板统一读它们的原生接口，差异在服务端吸收掉 |
 
 ## 快速上手
 
@@ -69,26 +69,29 @@ go build -o bin/panel.exe ./cmd/panel
 cd ui && npm i && npm run build
 cd ../..
 
-# 3) 构建两个需要编译的服务
+# 3) 构建三个需要编译的服务
 cd cmdgo-bridge-main && npm i && npm run build
 cd ../Qoder-free-main && go build -o bin/qoder-free.exe ./cmd/server
+cd ../zen-free-main   && go build -o bin/zen-free.exe   ./cmd/server
 cd ..
 
 # 4) 启动（必须在 panel/ 目录下启动，数据与日志路径是相对它的）
 cd panel && bin/panel.exe
 ```
 
-> 输出文件名不是随便取的：面板的注册表按 `bin\qoder-free.exe` 查找该服务的可执行文件，路径对不上会启不来。
+> 输出文件名不是随便取的：面板的注册表按 `bin\qoder-free.exe`、`bin\zen-free.exe` 查找这两个服务的可执行文件，路径对不上会启不来。
 >
 > cmdgo-bridge 不需要手动建配置，它第一次运行会在 `~/.cmdgo-bridge/config.json` 自动生成（含随机密钥）。
+>
+> zen-free 也不需要填密钥，它第一次运行会在自己目录下生成 `config.json`（含随机 api_key，只是本机鉴权用；上游凭据是公开的 `public`）。
 
-Windows 上可以直接双击根目录的 `start.bat` / `stop.bat`（会依次拉起面板与四个服务，并轮询到就绪）。
+Windows 上可以直接双击根目录的 `start.bat` / `stop.bat`（会依次拉起面板与五个服务，并轮询到就绪）。
 
 启动后打开 **http://127.0.0.1:9000**。
 
 > 面板启动时会自动收编已经在跑的服务，不需要先停掉它们。
 
-## 四个服务
+## 五个服务
 
 | 服务 | 端口 | 技术栈 | 说明 |
 |---|---|---|---|
@@ -96,8 +99,9 @@ Windows 上可以直接双击根目录的 `start.bat` / `stop.bat`（会依次�
 | WorkBuddy-free | 7863 | Go | 功能最多：账号池、签到、积分任务、用量统计 |
 | Cline-free | 8787 | Node | 同时提供 OpenAI 与 Anthropic 两种协议；可选模型最多 |
 | cmdgo-bridge | 8014 | Node | Command Code 反代，OAuth 登录 |
+| Zen-free | 8020 | Go | OpenCode Zen 匿名免费通道：**没有账号**，只暴露上游判定为免费的模型 |
 
-这四个是**独立项目**（其中三个由本仓库作者维护），API-free 只做聚合管理，不修改它们的代码。
+前四个是**独立项目**（其中三个由本仓库作者维护），API-free 只做聚合管理，不修改它们的代码。Zen-free 是本仓库的第五个服务（`zen-free-main/`），形状上与前四个一致，但口径不同：没有账号池、没有积分、免费额度按出口 IP 限流，用量记在自己目录下的账本里。它的上游形状只在一个文件里（`zen-free-main/internal/compat`），上游改动时改那里并跑 `bin/zen-free.exe -probe` 自检。
 
 ## 接入客户端
 
@@ -113,8 +117,8 @@ Windows 上可以直接双击根目录的 `start.bat` / `stop.bat`（会依次�
 
 ## 面板功能
 
-- **总览** — 四张服务卡（状态 / 账号 / 积分 / 模型 / 今日用量 + 30 天迷你趋势）、用量趋势、时段分布、模型与账号排行、服务质量、面板事件流。
-- **服务页** — 每个服务一套页签：账号池、模型、用量、日志、接入、设置；workbuddy 另有任务中心，cline 另有模型库、对话测试、上游渠道。
+- **总览** — 五张服务卡（状态 / 账号 / 积分 / 模型 / 今日用量 + 30 天迷你趋势）、用量趋势、时段分布、模型与账号排行、服务质量、面板事件流。
+- **服务页** — 每个服务一套页签：账号池、模型、用量、日志、接入、设置；workbuddy 另有任务中心，cline 另有模型库、对话测试、上游渠道，zen 没有账号池所以不摆账号页签。
 - **统计** — 跨服务用量聚合，按天落 SQLite（`modernc.org/sqlite`，纯 Go 无需 CGO）。
 - **日志** — 面板事件流 + 各服务运行日志（按服务自身的接口能力如实呈现，没有的会说明原因而不是显示空白）。
 - **设置** — 服务注册表、进程监督参数、各服务的在线配置编辑（标注哪些字段需要重启才生效）。
@@ -139,10 +143,11 @@ API-free/
 │   │   ├── stats/             按天用量聚合（SQLite）
 │   │   └── events/            面板事件环形缓冲
 │   └── ui/                    React 前端（构建产物由面板静态托管）
-├── Qoder-free-main/           四个被管理的服务（各自独立）
+├── Qoder-free-main/           五个被管理的服务（四个是独立上游项目，zen-free-main 在本仓库内）
 ├── workbuddy-free-main/
 ├── cline-free-main/
 ├── cmdgo-bridge-main/
+├── zen-free-main/             OpenCode Zen 匿名免费通道（无账号池，上游形状集中在 internal/compat）
 ├── docs/                      接入指南 / 页面规划 / 计划方案
 ├── prototypes/                早期设计原型（保留作记录）
 ├── start.bat / stop.bat       Windows 一键启停
@@ -153,9 +158,12 @@ API-free/
 - **密钥不入库。** 仓库只保留 `*.example` 模板，真实配置都在 `.gitignore` 里。首次克隆后按上面的步骤自己填。
 - **不要暴露到公网。** 面板的代理会注入各服务的真实密钥；虽然读明文密钥的接口只对本机开放（非 loopback 返回 403），整站仍应只在可信网络内使用。
 - 各服务有自己的上游服务条款，使用前请自行确认。
+- **zen-free 尤其要看条款。** 它接的是 OpenCode Zen 的匿名免费通道，上游对该通道的说明是「free tier can only be used from within OpenCode」，把它接进第三方客户端处于灰区；上游还会随时调整准入规则（2026-09 就加过两道），届时需要按 `zen-free-main/README.md` 的「上游形状」一节跟着改。免费额度按出口 IP 限流，本项目不做多出口 / IP 池。
 
 ## 许可
 
 本仓库的代码与文档以 [MIT](panel/LICENSE) 发布。
 
 `Qoder-free-main/`、`workbuddy-free-main/`、`cline-free-main/`、`cmdgo-bridge-main/` 是各自独立的上游项目，随本仓库一并提供以便开箱可用。它们各自遵循其原始许可证（均为 MIT），版权与条款见各目录下的 `LICENSE` 文件。
+
+`zen-free-main/` 是本仓库自己的服务，但它的请求形状移植自 [opencode2dsh](https://github.com/FishBottle7/opencode2dsh)（MIT © FishBottle7，其 Go 侧又是 [opencode2api](https://github.com/jasonxu114514/opencode2api) 的移植）——出处与移植范围逐项写在 `zen-free-main/README.md` 的「致谢与许可」一节。

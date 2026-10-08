@@ -20,13 +20,24 @@ const TABS_FOR: Record<string, [TabId, string][]> = {
   cline: [['acct', '账号'], ['library', '模型库'], ['chat', '对话测试'], ['models', '模型'], ['upstreams', '渠道'], ['usage', '用量'], ['logs', '日志'], ['access', '接入'], ['conf', '设置']],
   qoder: [['acct', '账号'], ['models', '模型'], ['usage', '用量'], ['logs', '日志'], ['access', '接入'], ['conf', '设置']],
   cmdgo: [['acct', '账号'], ['models', '模型'], ['usage', '用量'], ['logs', '日志'], ['access', '接入'], ['conf', '设置']],
+  /* zen 没有账号池也没有积分：不摆一个永远空着的「账号」页签，
+     首屏直接是模型表。第一项不再是 acct，所以初始页签按服务自己的列表取。 */
+  zen: [['models', '模型'], ['usage', '用量'], ['logs', '日志'], ['access', '接入'], ['conf', '设置']],
+}
+
+function tabsFor(id: string): [TabId, string][] {
+  return TABS_FOR[id] ?? TABS_FOR.qoder
 }
 
 export function ServicePage({ id }: { id: string }) {
   const [snap, setSnap] = useState<SvcSnapshot | null>(null)
-  const [tab, setTab] = useState<TabId>('acct')
+  /* 初始页签取本服务自己的第一项：四个老服务的首项都是 acct，行为不变；
+     zen 的首项是 models（它没有账号页签）。 */
+  const [tab, setTab] = useState<TabId>(() => tabsFor(id)[0][0])
   const [confirmStop, setConfirmStop] = useState(false)
   const [meta, setMeta] = useState<any>(null)
+
+  useEffect(() => { setTab(tabsFor(id)[0][0]) }, [id])
 
   useEffect(() => {
     let alive = true
@@ -43,10 +54,10 @@ export function ServicePage({ id }: { id: string }) {
   }, [id])
 
   /* 服务自身的版本与运行时长（原面板侧栏有「v1.0.0 · 运行 3h」）。
-     只有 workbuddy/qoder 的 overview 提供，cline/cmdgo 没有这个口径。 */
+     workbuddy/qoder/zen 的 overview 提供这两个字段，cline/cmdgo 没有这个口径。 */
   const api = useSvcApi(id)
   useEffect(() => {
-    if (id !== 'workbuddy' && id !== 'qoder') { setMeta(null); return }
+    if (id !== 'workbuddy' && id !== 'qoder' && id !== 'zen') { setMeta(null); return }
     let alive = true
     const load = () => api('/panel/api/overview')
       .then((j) => { if (alive) setMeta(j) })
@@ -128,7 +139,7 @@ export function ServicePage({ id }: { id: string }) {
       )}
 
       <div className="tabs">
-        {(TABS_FOR[id] ?? TABS_FOR.qoder).map(([v, label]) => (
+        {tabsFor(id).map(([v, label]) => (
           <button key={v} className={tab === v ? 'on' : ''} onClick={() => setTab(v)}>{label}</button>
         ))}
       </div>
@@ -1287,6 +1298,9 @@ function ModelsPanel({ id, live }: { id: string; live: boolean }) {
   const api = useSvcApi(id)
   const [rows, setRows] = useState<any[]>([])
   const [err, setErr] = useState('')
+  /* zen 的模型页默认列上游目录里的全部模型（免费与否逐个标出来），
+     所以取数时就带上 ?all=1，筛选用本地状态切。 */
+  const [zenFreeOnly, setZenFreeOnly] = useState(false)
   const load = useCallback(async () => {
     try {
       if (id === 'cmdgo') {
@@ -1297,7 +1311,7 @@ function ModelsPanel({ id, live }: { id: string; live: boolean }) {
         const list = pick<any[]>(j, 'models', 'enabled', 'data') ?? []
         setRows(Array.isArray(list) ? list.map((m) => (typeof m === 'string' ? { id: m } : m)) : [])
       } else {
-        const j = await api('/panel/api/models')
+        const j = await api(id === 'zen' ? '/panel/api/models?all=1' : '/panel/api/models')
         setRows(pick<any[]>(j, 'models', 'catalog', 'items') ?? [])
       }
       setErr('')
@@ -1406,6 +1420,103 @@ function ModelsPanel({ id, live }: { id: string; live: boolean }) {
             })}
           </tbody>
         </table></div>
+      </div>
+    )
+  }
+
+  /* ---- zen：匿名免费通道。后端 ?all=1 回上游目录里的全部模型，
+        每个都带 exposed/free 与未暴露原因，所以「哪些是免费的」在这张表上直接标出来。
+        row = {id, exposed, free, billing, reason, supports_reasoning, supported_efforts,
+               input_modalities, context_window, max_output} ---- */
+  if (id === 'zen') {
+    const k = (v: unknown) => (v != null && Number(v) > 0 ? `${Math.round(Number(v) / 1000)}K` : '—')
+    const freeRows = rows.filter((m) => m.exposed === true)
+    const shown = zenFreeOnly ? freeRows : rows
+    return (
+      <div className="sect" style={{ marginBottom: 0 }}>
+        <div className="sect-head">
+          <h3>模型目录</h3>
+          <span className="sub">
+            上游目录 {rows.length} 个 · <b>免费 {freeRows.length} 个</b> · 其余判定为付费/下架，调用会返回 400 并写明原因
+          </span>
+          <span className="sp" />
+          <div className="seg">
+            <button className={zenFreeOnly ? '' : 'on'} onClick={() => setZenFreeOnly(false)}>全部 {rows.length}</button>
+            <button className={zenFreeOnly ? 'on' : ''} onClick={() => setZenFreeOnly(true)}>仅免费 {freeRows.length}</button>
+          </div>
+          <button className="btn xs" onClick={() => void load()}>重新获取</button>
+        </div>
+        <div className="tbox"><table>
+          <thead><tr>
+            <th style={{ width: 6 }}></th>
+            <th>模型 ID</th>
+            <th style={{ width: 84 }}>思考</th>
+            <th style={{ width: 190 }}>可选档位</th>
+            <th className="num-r" style={{ width: 96 }}>上下文</th>
+            <th className="num-r" style={{ width: 92 }}>最大输出</th>
+            <th style={{ width: 108 }}>能否调用</th>
+          </tr></thead>
+          <tbody>
+            {shown.map((m, i) => {
+              const mid = String(pick(m, 'id') ?? i)
+              const isFree = m.exposed === true
+              const reasoning = pick(m, 'supports_reasoning', 'is_reasoning') === true
+              const effortsRaw = pick<any[]>(m, 'supported_efforts')
+              const efforts: string[] = Array.isArray(effortsRaw) ? effortsRaw.map(String) : []
+              const modalities = pick<any[]>(m, 'input_modalities')
+              const billing = String(pick(m, 'billing', 'price_label') ?? '可用')
+              const reason = String(pick(m, 'reason') ?? '')
+              const lastError = String(pick(m, 'last_error') ?? '')
+              const lastErrorAt = String(pick(m, 'last_error_at') ?? '')
+              const lastOK = String(pick(m, 'last_ok_at') ?? '')
+              const shortTime = lastErrorAt.length >= 16 ? lastErrorAt.slice(11, 16) : ''
+              return (
+                <tr key={mid + i} style={isFree ? undefined : { opacity: 0.55 }}>
+                  <td>{isFree ? <span className="mark" /> : null}</td>
+                  <td className="m">
+                    {/* 模型 ID 直接点就复制：接客户端时要的就是这个串 */}
+                    <button
+                      className="linklike"
+                      title="点击复制模型 ID"
+                      onClick={() => { navigator.clipboard.writeText(mid).then(() => toast('模型 ID 已复制：' + mid, 'ok')) }}
+                    >
+                      {mid}
+                    </button>
+                    {Array.isArray(modalities) && modalities.includes('image')
+                      ? <span className="chip" style={{ marginLeft: 6 }}>图片</span>
+                      : null}
+                    {/* 这个通道的模型可用性是浮动的：最近一次尝试失败就说清楚为什么 */}
+                    {lastError
+                      ? <div style={{ fontSize: 11, color: 'var(--bad)', marginTop: 2 }} title={lastError}>
+                          上次失败{shortTime ? ` ${shortTime}` : ''}：{lastError.length > 58 ? lastError.slice(0, 58) + '…' : lastError}
+                        </div>
+                      : lastOK
+                        ? <div className="faint" style={{ fontSize: 11, marginTop: 2 }}>最近一次调用成功</div>
+                        : null}
+                  </td>
+                  <td>{reasoning ? <span className="st warn"><i />推理</span> : <span className="st mute"><i />标准</span>}</td>
+                  <td>
+                    {reasoning && efforts.length > 0
+                      ? efforts.map((e) => <span key={e} className="st mute" style={{ marginRight: 5 }}><i />{e}</span>)
+                      : <span className="faint" style={{ fontSize: 11.5 }}>{reasoning ? 'off 可关思考' : '—'}</span>}
+                  </td>
+                  <td className="num-r">{k(pick(m, 'context_window'))}</td>
+                  <td className="num-r">{k(pick(m, 'max_output'))}</td>
+                  <td>
+                    {isFree
+                      ? <span className="st ok"><i />免费</span>
+                      : <span className="st mute" title={reason}><i />{billing}</span>}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table></div>
+        <p className="faint" style={{ fontSize: 11.5, marginTop: 8 }}>
+          免费 = 上游实时目录里存在、且 models.dev 判定 cost 为 0（下架的一票否决），只有这些能被调用。
+          「思考」为推理的模型默认就在思考，正文为空时看 reasoning_content；要真正停思考需发 reasoning_effort: "none"（off 档位即此）。
+          「不承载」的 Muse 系列走 Responses 协议，本服务只承载 OpenAI Chat。
+        </p>
       </div>
     )
   }
@@ -1527,7 +1638,8 @@ function LogsPanel({ id, live }: { id: string; live: boolean }) {
   const [auto, setAuto] = useState(true)
 
   useEffect(() => {
-    if (!live || (id !== 'qoder' && id !== 'workbuddy')) return
+    /* zen 也有 /panel/api/logs（内存环形缓冲，快照口径，与 workbuddy 同形）。 */
+    if (!live || (id !== 'qoder' && id !== 'workbuddy' && id !== 'zen')) return
     let alive = true
     let after = 0
     async function poll() {
@@ -1597,19 +1709,28 @@ function LogsPanel({ id, live }: { id: string; live: boolean }) {
   const note = ch === 'all'
     ? `任务 ${counts.task ?? 0} · 对话 ${counts.chat ?? 0} · 系统 ${counts.sys ?? 0}${counts.worker ? ` · worker ${counts.worker}` : ''}`
     : `${LOG_CH_NAME[ch] ?? ch} ${shown.length} 行`
+  /* zen 的日志频道是它自己的运行组件（startup / models / upstream / stream），
+     与 workbuddy 的「任务 / 对话 / 系统」不是一套词汇：这里按行数报，也不摆那三个筛子。 */
+  const zenLog = id === 'zen'
   return (
     <div className="sect" style={{ marginBottom: 0 }}>
       <div className="sect-head">
         <h3>运行日志</h3>
-        <span className="sub">{id === 'qoder' ? `最近 800 行 · 3s 增量 · ${note}` : `最近 500 行 · 3s 轮询 · ${note}`}</span>
+        <span className="sub">
+          {zenLog
+            ? `最近 500 行 · 3s 轮询 · 共 ${lines.length} 行`
+            : id === 'qoder' ? `最近 800 行 · 3s 增量 · ${note}` : `最近 500 行 · 3s 轮询 · ${note}`}
+        </span>
         <span className="sp" />
-        <div className="seg">
-          {['all', 'task', 'chat', 'sys'].map((k) => (
-            <button key={k} className={k === ch ? 'on' : ''} onClick={() => setCh(k)}>
-              {k === 'all' ? '全部' : LOG_CH_NAME[k]}
-            </button>
-          ))}
-        </div>
+        {!zenLog && (
+          <div className="seg">
+            {['all', 'task', 'chat', 'sys'].map((k) => (
+              <button key={k} className={k === ch ? 'on' : ''} onClick={() => setCh(k)}>
+                {k === 'all' ? '全部' : LOG_CH_NAME[k]}
+              </button>
+            ))}
+          </div>
+        )}
         <button className="btn xs" onClick={() => setAuto(!auto)}>自动滚动：{auto ? '开' : '关'}</button>
       </div>
       {err && <div className="alertbar err"><span className="ico" /><span>{err}</span></div>}
@@ -1779,6 +1900,29 @@ const CFG_LAYOUT: Record<string, CfgGroup[]> = {
       fields: [{ k: 'override_prompt', label: '覆盖内容', type: 'textarea', placeholder: '留空 = 用客户端自己的 system 提示', allowEmpty: true, hint: '清空并保存 = 撤销覆盖，回到客户端自带 system' }],
     },
   ],
+  zen: [
+    {
+      title: '上游与模型目录',
+      note: '匿名免费通道：没有账号池与积分口径，免费额度按出口 IP 限流',
+      fields: [
+        { k: 'upstream.zen', label: '上游基址', placeholder: 'https://opencode.ai/zen', hint: '正式运行不要改；需重启' },
+        { k: 'models.refresh_seconds', label: '实时目录刷新间隔（秒）', type: 'num', hint: '需重启' },
+        { k: 'models.metadata_refresh_hours', label: '免费判定元数据刷新（小时）', type: 'num', hint: '需重启' },
+        { k: 'models.metadata_cache_days', label: '元数据缓存有效期（天）', type: 'num', hint: '超过后暂时退回按名称判断免费' },
+      ],
+    },
+    {
+      title: '限额与超时',
+      note: '「模型排除名单」（models.exclude）没有在线编辑：它是字符串数组，直接改服务目录下的 config.json',
+      fields: [
+        { k: 'limits.request_body_mb', label: '请求体上限（MB）', type: 'num' },
+        { k: 'limits.request_timeout_seconds', label: '非流式整体超时（秒）', type: 'num' },
+        { k: 'limits.header_timeout_seconds', label: '首字节等待上限（秒）', type: 'num', hint: '冷启动慢的模型可调大' },
+        { k: 'limits.body_idle_seconds', label: '流静默断开阈值（秒）', type: 'num' },
+        { k: 'limits.max_retries', label: '上游失败重试次数', type: 'num', hint: '需重启' },
+      ],
+    },
+  ],
 }
 
 function SettingsPanel({ id, live, onGoAccess }: { id: string; live: boolean; onGoAccess: () => void }) {
@@ -1790,7 +1934,7 @@ function SettingsPanel({ id, live, onGoAccess }: { id: string; live: boolean; on
   const [hdrDefaults, setHdrDefaults] = useState<Record<string, string>>({})
 
   const groups = CFG_LAYOUT[id] ?? []
-  const paths: Record<string, string> = { qoder: '/panel/api/config', workbuddy: '/panel/api/config', cline: '/v1/config' }
+  const paths: Record<string, string> = { qoder: '/panel/api/config', workbuddy: '/panel/api/config', zen: '/panel/api/config', cline: '/v1/config' }
 
   const load = useCallback(async () => {
     try {

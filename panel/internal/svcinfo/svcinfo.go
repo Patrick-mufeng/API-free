@@ -137,6 +137,8 @@ func (c *Collector) collect() Report {
 			d = c.cline(svc)
 		case "cmdgo":
 			d = c.cmdgo(svc)
+		case "zen":
+			d = c.zen(svc)
 		default:
 			d = svcData{
 				Cool: Cool{Svc: svc.ID, Err: "该服务没有冷却口径"},

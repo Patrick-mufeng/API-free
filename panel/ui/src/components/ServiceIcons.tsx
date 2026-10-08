@@ -10,7 +10,10 @@
 import type { CSSProperties } from 'react'
 import { SERVICE_LOGOS, MARK_INNER } from './logos'
 
-/** 服务官方 logo。容器需自行给出尺寸与圆角；官方底板已含背景。 */
+/** 服务官方 logo。容器需自行给出尺寸与圆角；官方底板已含背景。
+ *
+ * 没有官方图形的服务（自建服务，如 zen）退化为中性字母牌：不伪造任何第三方
+ * 品牌资产，也不让页头的图标位空成一个洞。 */
 export function ServiceLogo({
   id,
   size = 18,
@@ -21,7 +24,32 @@ export function ServiceLogo({
   style?: CSSProperties
 }) {
   const src = SERVICE_LOGOS[id]
-  if (!src) return null
+  const radius = Math.max(3, Math.round(size * 0.28))
+  if (!src) {
+    return (
+      <span
+        aria-hidden
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: size,
+          height: size,
+          borderRadius: radius,
+          flex: 'none',
+          background: 'var(--line)',
+          color: 'var(--muted)',
+          fontSize: Math.max(9, Math.round(size * 0.52)),
+          fontWeight: 700,
+          lineHeight: 1,
+          textTransform: 'uppercase',
+          ...style,
+        }}
+      >
+        {id.slice(0, 1)}
+      </span>
+    )
+  }
   return (
     <img
       src={src}
@@ -29,7 +57,7 @@ export function ServiceLogo({
       height={size}
       alt=""
       aria-hidden
-      style={{ display: 'block', borderRadius: Math.max(3, Math.round(size * 0.28)), flex: 'none', ...style }}
+      style={{ display: 'block', borderRadius: radius, flex: 'none', ...style }}
     />
   )
 }

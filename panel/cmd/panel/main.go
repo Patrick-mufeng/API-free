@@ -36,7 +36,11 @@ const defaultRegistry = `{
     { "id": "cmdgo", "name": "cmdgo-bridge", "dir": "../cmdgo-bridge-main",
       "command": "node", "args": ["dist/index.js"],
       "env": {}, "port": 8014, "health": "/health",
-      "auth": { "file": "~/.cmdgo-bridge/config.json", "field": "apiKey", "format": "json" } }
+      "auth": { "file": "~/.cmdgo-bridge/config.json", "field": "apiKey", "format": "json" } },
+    { "id": "zen", "name": "Zen-free", "dir": "../zen-free-main",
+      "command": "bin\\zen-free.exe", "args": ["-config", "config.json"],
+      "env": {}, "port": 8020, "health": "/healthz",
+      "auth": { "file": "../zen-free-main/config.json", "field": "api_key", "format": "json" } }
   ]
 }
 `

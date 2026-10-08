@@ -57,13 +57,14 @@ func (c *Collector) Close() { _ = c.db.Close() }
 // PullAll 拉一轮全部运行中的服务；返回成功/失败数。
 func (c *Collector) PullAll(statusOf func(id string) bool) (int, int) {
 	okN, failN := 0, 0
-	for _, id := range []string{"workbuddy", "qoder", "cline", "cmdgo"} {
+	for _, id := range []string{"workbuddy", "qoder", "zen", "cline", "cmdgo"} {
 		if statusOf != nil && !statusOf(id) {
 			continue
 		}
 		var err error
 		switch id {
-		case "workbuddy", "qoder":
+		case "workbuddy", "qoder", "zen":
+			// 三家都是 series[] 日序列口径（zen 按同一形状实现）
 			err = c.pullDaily(id)
 		case "cline":
 			err = c.pullCum("cline")
@@ -212,7 +213,7 @@ func (c *Collector) pullCum(svc string) error {
 // Days 返回最近 days 天、按服务展开的日序列；cline 用累计差分推导。
 func (c *Collector) Days(days int) (map[string]map[string]DayRow, []string) {
 	out := map[string]map[string]DayRow{} // date -> svc -> row
-	for _, svc := range []string{"workbuddy", "qoder", "cline", "cmdgo"} {
+	for _, svc := range []string{"workbuddy", "qoder", "zen", "cline", "cmdgo"} {
 		if svc == "cline" {
 			c.mergeCline(svc, days, out)
 			continue
@@ -230,7 +231,7 @@ func (c *Collector) Days(days int) (map[string]map[string]DayRow, []string) {
 		}
 		rows.Close()
 	}
-	return out, []string{"workbuddy", "qoder", "cline", "cmdgo"}
+	return out, []string{"workbuddy", "qoder", "zen", "cline", "cmdgo"}
 }
 
 func (c *Collector) mergeCline(svc string, days int, out map[string]map[string]DayRow) {

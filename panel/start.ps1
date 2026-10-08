@@ -1,11 +1,11 @@
-﻿# API-free 启动：拉起聚合面板，再由面板启动四个服务
+﻿# API-free 启动：拉起聚合面板，再由面板启动五个服务
 # 用法：双击项目根目录的 start.bat，或在此目录执行 powershell -File start.ps1
 $ErrorActionPreference = 'Continue'
 $panelDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $panelDir
 
 $BASE = 'http://127.0.0.1:9000'
-$SVCS = @('workbuddy', 'qoder', 'cline', 'cmdgo')
+$SVCS = @('workbuddy', 'qoder', 'zen', 'cline', 'cmdgo')
 
 if (-not (Test-Path 'bin\panel.exe')) {
     Write-Host '[!] 找不到 bin\panel.exe，请先编译： go build -o bin\panel.exe .\cmd\panel' -ForegroundColor Red
@@ -40,7 +40,7 @@ if (Test-Panel) {
 }
 
 # 2) 四个服务（经面板 API 启动，这样进程归面板托管、崩溃会自动拉起）
-Write-Host '[2/3] 启动四个服务 ...'
+Write-Host '[2/3] 启动五个服务 ...'
 $snap = (Invoke-RestMethod "$BASE/api/services").services
 foreach ($svc in $SVCS) {
     $cur = $snap | Where-Object { $_.id -eq $svc }

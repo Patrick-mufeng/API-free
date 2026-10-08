@@ -258,6 +258,44 @@ func (c *Collector) cmdgo(svc registry.Service) svcData {
 	return d
 }
 
+/* ---------- zen：OpenCode Zen 匿名免费通道。唯独没有账号池的服务 ---------- */
+
+// overview: models_exposed/models_total、rate_limited、rate_limit_until、
+// today.{requests,failures,input,output}、catalog.{status,source,metadata.ready}、
+// note（服务自己写的一句现状说明）。
+//
+// 口径差异（与另外四个服务不同，别照抄账号池那套）：
+//   - 匿名通道不绑账号，Accounts/Healthy/Credits 一律留 nil → 界面显示「—」；
+//   - 没有账号级冷却，唯一类似冷却是**上游按出口 IP 限流**，
+//     故 Cool.Unit = "上游限流"，限流中计 1 并出一条 cooling 告警；
+//   - 用量不在卡片里，走 stats 页（本服务实现了 /panel/api/stats 的 series 形状）。
+func (c *Collector) zen(svc registry.Service) svcData {
+	d := svcData{Cool: Cool{Svc: svc.ID, Unit: "上游限流"}, Card: Card{Svc: svc.ID}}
+	doc, err := c.get(svc, "/panel/api/overview")
+	if err != nil {
+		d.Cool.Err, d.Card.Err = err.Error(), err.Error()
+		return d
+	}
+	d.Cool.OK, d.Card.OK = true, true
+
+	if v := optInt(doc, "models_exposed"); v != nil && *v > 0 {
+		d.Card.Models = v
+	}
+	if asBool(doc["rate_limited"]) {
+		d.Cool.N = 1
+		d.Alerts = append(d.Alerts, Alert{
+			Svc: svc.ID, Kind: "cooling", Until: clockOf(doc["rate_limit_until"]),
+			Text: "上游按出口 IP 限流中" + untilSuffix(doc["rate_limit_until"]),
+		})
+	}
+	if note := asStr(doc["note"]); note != "" {
+		d.Card.Note = note
+	} else {
+		d.Card.Note = "匿名免费通道：没有账号池，免费额度按出口 IP 限流"
+	}
+	return d
+}
+
 /* ---------- 小工具 ---------- */
 
 // optInt 字段缺失返回 nil（= 该服务没有这个口径），与真实的 0 区分。

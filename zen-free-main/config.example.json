@@ -1,0 +1,43 @@
+{
+  // 监听地址。必须是回环地址——面板的代理会注入本服务的密钥，
+  // 这个端口不该出现在公网上。默认 127.0.0.1:8020。
+  "listen": "127.0.0.1:8020",
+
+  // 本服务的 API Key。留空则首次启动自动生成并写回本文件；
+  // 面板按 auth{file,field:"api_key",format:"json"} 读取它。
+  "api_key": "",
+
+  // 运行时数据（models.dev 缓存、用量账本）。相对路径以本文件所在目录为基准。
+  "data_dir": "data",
+
+  "upstream": {
+    // 上游基址，匿名通道在其 /v1 下。正式运行不要改。
+    "zen": "https://opencode.ai/zen"
+  },
+
+  "models": {
+    // 实时目录（S1）刷新周期（秒）
+    "refresh_seconds": 300,
+    // models.dev 免费判定元数据（S2）刷新周期（小时）
+    "metadata_refresh_hours": 24,
+    // 磁盘缓存在多少天内可被信任（超过则退回按名称判断）
+    "metadata_cache_days": 7,
+    // 永不暴露的模型：精确 id，或以 * 结尾的前缀。
+    // muse-spark* 走 Responses 协议，本服务只承载 Chat，故默认排除。
+    "exclude": ["muse-spark*"]
+  },
+
+  "limits": {
+    // 请求体上限（MB）
+    "request_body_mb": 32,
+    // 非流式请求的整体超时（秒）；流式不设整体超时，只受下面的静默窗口约束
+    "request_timeout_seconds": 600,
+    // 等待上游响应头的上限（秒）。免费通道实测响应时间 1s～90s 不等，
+    // 所以给得宽一点，别让我们这层先掐断（客户端自己的超时通常更短）
+    "header_timeout_seconds": 180,
+    // 流中静默超过该秒数即判定连接已死并断开（秒）
+    "body_idle_seconds": 300,
+    // 上游 429/5xx/传输错误时的重试次数（不含首次）
+    "max_retries": 2
+  }
+}
