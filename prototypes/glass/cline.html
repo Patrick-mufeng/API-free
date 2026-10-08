@@ -1,0 +1,768 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cline-free · API-free</title>
+<link rel="stylesheet" href="glass.css">
+<style>
+  .acctgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:22px}
+  .acard{border-top:1px solid var(--line);padding-top:14px}
+  .kv2{display:grid;grid-template-columns:1fr 1fr;gap:8px 22px;font-size:12.5px}
+  .kv2 .k{color:var(--faint);font-size:11px}
+  .acard .ops{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
+  .grp-h{display:flex;align-items:center;gap:10px;padding:12px 2px;border-top:1px solid var(--line)}
+  .grp-h .dot{width:8px;height:8px;border-radius:50%;flex:none}
+  .mcard{display:flex;align-items:center;gap:10px;padding:10px 2px;border-top:1px solid var(--line-soft);flex-wrap:wrap}
+  .mcard .mid{font-family:var(--mono);font-size:12px;color:var(--muted)}
+  .facts{margin:0;padding-left:18px;font-size:12.5px;color:var(--muted);line-height:1.9}
+  .facts b{color:var(--text)}
+  .chatbox{border-top:1px solid var(--line);border-bottom:1px solid var(--line);min-height:300px;max-height:440px;overflow:auto;padding:16px 2px}
+  .bub{display:flex;gap:10px;margin-bottom:16px}
+  .bub .av{width:26px;height:26px;border-radius:8px;background:var(--accent-soft);color:var(--muted);display:grid;place-items:center;font-size:11px;font-weight:650;flex:none}
+  .bub.ai .av{background:var(--ok-soft);color:var(--ok)}
+  .bub.err .av{background:var(--bad-soft);color:var(--bad)}
+  .bub .bd{flex:1;min-width:0}
+  .bub .txt{font-size:13px;white-space:pre-wrap;word-break:break-word}
+  .bub .stats{font-size:11px;color:var(--faint);font-family:var(--mono);margin-top:6px}
+  .think{border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:12px;color:var(--muted);margin:6px 0;cursor:pointer}
+  .sqgrid{display:flex;flex-wrap:wrap;gap:3px;max-width:420px}
+  .sqgrid i{width:9px;height:9px;border-radius:2px;background:var(--ink);opacity:.75}
+  .sqgrid i.r{background:var(--bad-soft)}
+  .chatwrap{display:grid;grid-template-columns:1.7fr 1fr;gap:34px}
+  .logsplit{display:grid;grid-template-columns:1.4fr 1fr;gap:26px}
+  .lrow{display:grid;grid-template-columns:64px 1fr 62px 66px 70px 66px;gap:8px;padding:7px 4px;border-top:1px solid var(--line-soft);font-size:12px;font-family:var(--mono);cursor:pointer;align-items:center}
+  .lrow:hover{background:var(--accent-soft)}
+  .lrow.sel{background:var(--accent-soft)}
+  .lhead{border-top:1px solid var(--line);color:var(--faint);font-size:10.5px}
+  .detail dt{font-size:11px;color:var(--faint);margin-top:9px}
+  .detail dd{margin:1px 0 0;font-size:12.5px;font-family:var(--mono)}
+  pre.snip{background:#f7f6f3;border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-family:var(--mono);font-size:11.5px;line-height:1.8;overflow:auto;white-space:pre-wrap;word-break:break-all;margin:10px 0 0}
+  @media (max-width:900px){.acctgrid,.chatwrap,.logsplit{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="pagehead">
+    <svg width="34" height="34" viewBox="0 0 32 32" style="border:1px solid var(--line);border-radius:11px;background:#fff"><text x="16" y="21.5" text-anchor="middle" font-size="14" font-weight="700" fill="#1c1c1a">C</text></svg>
+    <div>
+      <h1 style="margin:0;font-size:19px;font-weight:650">Cline-free</h1>
+      <div class="sub">Node · 端口 8787 · 常驻进程 · 崩溃自动拉起已启用 · 密钥已配置 · v2.3.0</div>
+    </div>
+    <span class="st run" id="svcBadge"><i></i>运行中</span>
+    <span style="flex:1"></span>
+    <button class="btn" id="refreshBtn" title="刷新状态与模型">刷新</button>
+    <button class="btn" id="restartBtn">重启</button>
+    <button class="sw" role="switch" aria-checked="true" aria-label="服务开关" id="svcSwitch"></button>
+  </div>
+  <div class="confirm" id="svcConfirm" style="display:none;margin:-16px 0 26px">
+    <span>停止后该服务将不可用，进行中的请求会失败。</span><span style="flex:1"></span>
+    <button class="btn ghost" id="cfCancel">取消</button>
+    <button class="btn dgr" id="cfOk">确认停止</button>
+  </div>
+
+  <div class="tabs" id="svcTabs">
+    <button class="on" data-t="chat">对话测试</button>
+    <button data-t="accounts">账号</button>
+    <button data-t="models">模型</button>
+    <button data-t="usage">统计</button>
+    <button data-t="logs">日志</button>
+    <button data-t="config">接入配置</button>
+    <button data-t="upstreams">上游渠道</button>
+    <button data-t="settings">设置</button>
+  </div>
+
+  <!-- ================= 对话测试 ================= -->
+  <div class="tabpanel on" id="tp-chat">
+    <div class="chatwrap">
+      <div class="sect">
+        <div class="sect-head"><h3>对话</h3><span class="sub">多轮对话自动带上下文</span><span class="sp"></span>
+          <button class="btn xs" id="exportChat">导出记录</button><button class="btn xs" id="clearChat">清空</button></div>
+        <div class="chatbox" id="thread">
+          <div class="empty" id="chatEmpty"><b>还没有消息。</b><span>在下面输入内容开始测试，多轮对话会自动带上上下文。</span></div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:14px;align-items:flex-start">
+          <textarea id="chatInput" rows="2" placeholder="输入消息，Enter 发送 / Shift+Enter 换行" style="flex:1"></textarea>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <button class="btn pri" id="sendBtn">发送</button>
+            <button class="btn" id="stopBtn" style="display:none">停止生成</button>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="sect">
+          <div class="sect-head"><h3>模型与参数</h3></div>
+          <div style="border-top:1px solid var(--line);padding-top:14px">
+            <label class="muted" style="font-size:12px;display:block;margin-bottom:6px">模型</label>
+            <select id="chatModel" style="width:100%"><option>deepseek-v3.2 · cline-free/deepseek-v3.2</option><option>glm-5.2 · zai/glm-5.2</option><option>kimi-k2 · moonshot/kimi-k2</option></select>
+            <label class="check" style="margin-top:12px"><input type="checkbox" checked> 流式输出</label>
+            <details style="margin-top:14px">
+              <summary class="muted" style="font-size:12.5px;cursor:pointer">生成参数（可选）</summary>
+              <div style="margin-top:10px">
+                <label class="muted" style="font-size:12px;display:block">system prompt</label>
+                <textarea rows="3" placeholder="留空则不发送" style="margin-top:4px"></textarea>
+                <label class="muted" style="font-size:12px;display:block;margin-top:8px">temperature</label>
+                <input type="text" placeholder="留空则不发送" style="width:100%;margin-top:4px">
+                <label class="muted" style="font-size:12px;display:block;margin-top:8px">top_p</label>
+                <input type="text" placeholder="留空则不发送" style="width:100%;margin-top:4px">
+                <p class="faint" style="font-size:11px;margin:8px 0 0">max_tokens 会被服务端剥离（上游收到会报错），输出长度由模型决定。</p>
+              </div>
+            </details>
+          </div>
+        </div>
+        <div class="sect">
+          <div class="sect-head"><h3>本次指标</h3></div>
+          <div class="tbox"><table><tbody id="chatStats">
+            <tr><td class="muted">首字节</td><td class="num-r m" id="csTtft">—</td></tr>
+            <tr><td class="muted">生成耗时</td><td class="num-r m" id="csGen">—</td></tr>
+            <tr><td class="muted">总耗时</td><td class="num-r m" id="csTotal">—</td></tr>
+            <tr><td class="muted">输出速度</td><td class="num-r m" id="csTps">—</td></tr>
+            <tr><td class="muted">输入 token</td><td class="num-r m" id="csIn">—</td></tr>
+            <tr><td class="muted">输出 token</td><td class="num-r m" id="csOut">—</td></tr>
+            <tr><td class="muted">结束原因</td><td class="num-r m" id="csFin">—</td></tr>
+          </tbody></table></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 账号 ================= -->
+  <div class="tabpanel" id="tp-accounts">
+    <div class="sect">
+      <div class="sect-head">
+        <h3>账号池</h3><span class="sp"></span>
+        <button class="btn xs" title="清除所有账号的冷却状态与 token 缓存">重置全部冷却</button>
+        <button class="btn xs" title="启用被停用的账号">全部启用</button>
+        <button class="btn xs">刷新</button>
+        <button class="btn xs pri" id="loginBtn">登录新账号</button>
+      </div>
+      <div style="display:flex;gap:26px;margin-bottom:8px" class="tok">
+        <div><span style="font-size:18px;font-weight:650">2</span> <span class="muted" style="font-size:12px">可用</span></div>
+        <div><span style="font-size:18px;font-weight:650;color:var(--warn)">1</span> <span class="muted" style="font-size:12px">冷却中</span></div>
+        <div><span style="font-size:18px;font-weight:650;color:var(--off)">1</span> <span class="muted" style="font-size:12px">已停用</span></div>
+        <div><span style="font-size:18px;font-weight:650">4</span> <span class="muted" style="font-size:12px">总数</span></div>
+        <span class="muted" style="font-size:12px;align-self:center" id="acctHint">所有账号都有模型在冷却；额度按「账号×模型」独立计算，等恢复或加号</span>
+      </div>
+      <div class="acctgrid" id="acctGrid"></div>
+    </div>
+
+    <div class="sect">
+      <div class="sect-head"><h3>关于账号持久化</h3></div>
+      <ul class="facts" style="border-top:1px solid var(--line);padding:14px 2px 14px 34px">
+        <li>控制台登录得到的 refreshToken 只存在<b>当前实例内存</b>，进程重启或重新部署后消失。</li>
+        <li>要长期生效，把 refreshToken 填进部署环境变量 CLINE_REFRESH_TOKEN（多账号一行一个），保存后重新部署。</li>
+        <li>登录来的账号会在卡片上标注「临时」，与环境变量里的常驻账号区分。</li>
+        <li><b>停用</b>只影响当前实例的轮询，重启即恢复；环境变量里的账号不能移除（下次读取又会出现），只能用停用让它下线。</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ================= 模型 ================= -->
+  <div class="tabpanel" id="tp-models">
+    <div class="sect">
+      <div class="sect-head"><h3>模型库</h3><span class="sub" id="mStatus">数据来自 api.cline.bot · 已缓存</span><span class="sp"></span>
+        <button class="btn xs">显示描述</button><button class="btn xs">刷新数据</button></div>
+      <p class="muted" style="font-size:12.5px;line-height:1.8;margin:0 0 20px;border-top:1px solid var(--line);padding-top:14px">
+        数据来自 api.cline.bot（由服务端抓取 —— 浏览器直连会被 CORS 拦截）。点分组标题右侧的「全部添加」可一键加入该组所有模型，点单个模型卡片上的 ＋ 单独添加；重复添加会自动跳过。也可点「检测」先发一次小请求确认它现在能不能用（可能消耗少量额度）。</p>
+    </div>
+
+    <div class="sect">
+      <div class="sect-head"><h3>可用模型分组</h3><span class="sub">共 12 个 · 已启用 3 个</span></div>
+      <div class="grp-h"><span class="dot" style="background:#3d6fd0"></span><b style="font-size:13px">DeepSeek</b><span class="faint" style="font-size:11.5px">（deepseek-free）</span><span class="faint" style="font-size:11.5px;margin-left:auto">共 3 个 · 待添加 1</span><button class="btn xs pri">全部添加 (1)</button></div>
+      <div id="grpDeepseek"></div>
+      <div class="grp-h" style="border-top:1px solid var(--line)"><span class="dot" style="background:#c07427"></span><b style="font-size:13px">ZAI</b><span class="faint" style="font-size:11.5px">（zai）</span><span class="faint" style="font-size:11.5px;margin-left:auto">共 2 个 · 已全部添加</span><button class="btn xs" disabled>已全部添加</button></div>
+      <div id="grpZai"></div>
+    </div>
+
+    <div class="sect">
+      <details>
+        <summary style="cursor:pointer;display:flex;align-items:center;gap:10px;padding:12px 2px;border-top:1px solid var(--line)">
+          <b style="font-size:13px">全部模型</b><span class="faint" style="font-size:11.5px">446 个模型 · 17 个供应商</span></summary>
+        <p class="muted" style="font-size:12px;margin:10px 0">上游全部可选模型（含付费档），展开后才抓取，服务端缓存 30 分钟。按供应商（模型 ID 里 / 前那一段）分组，每组标题右侧都能「全部添加」。</p>
+        <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px">
+          <input type="search" id="catSearch" placeholder="搜索名称或 ID（如 gpt、qwen、flash）" style="flex:1;max-width:340px">
+          <span class="faint" style="font-size:11.5px" id="catCount">446 个模型 · 17 个供应商</span>
+        </div>
+        <div id="catGroup"><div class="grp-h"><span class="dot" style="background:#2f9e5f"></span><b style="font-size:13px">Qwen</b><span class="faint" style="font-size:11.5px;margin-left:auto">匹配 N 个</span></div><div id="catList"></div></div>
+      </details>
+    </div>
+
+    <div class="sect">
+      <div class="sect-head"><h3>已启用模型</h3><span class="sub">共 3 个</span></div>
+      <p class="muted" style="font-size:12px;margin:0 0 10px">只有这里的模型会出现在 /v1/models 里。点「移除」即可撤下。</p>
+      <div id="enabledList"></div>
+    </div>
+  </div>
+
+  <!-- ================= 统计 ================= -->
+  <div class="tabpanel" id="tp-usage">
+    <div class="sect">
+      <div class="sect-head"><h3>重试放大</h3><span class="sub">统计自 09:12:03 · 6 小时 51 分钟前</span></div>
+      <div style="display:flex;gap:30px;align-items:center;border-top:1px solid var(--line);padding:16px 2px 20px;flex-wrap:wrap">
+        <div style="font-size:40px;font-weight:700;letter-spacing:-.02em">1.18<span style="font-size:20px;color:var(--muted)">×</span></div>
+        <div class="sqgrid" id="retryGrid"></div>
+        <p class="muted" style="font-size:12.5px;max-width:420px;margin:0">9 次是重试烧掉的 —— 客户端只发了 50 条消息，上游却实打实跑了 59 次。</p>
+      </div>
+    </div>
+
+    <div class="sect">
+      <div class="sect-head"><h3>用量总览</h3><span class="sub">按上游调用计，含重试的那几次</span></div>
+      <div class="stat6" style="grid-template-columns:repeat(7,1fr);margin-bottom:20px">
+        <div class="kpi"><h3>输入 token</h3><div class="v" style="font-size:18px">412.6万</div></div>
+        <div class="kpi"><h3>输出 token</h3><div class="v" style="font-size:18px">255.4万</div></div>
+        <div class="kpi"><h3>合计 token</h3><div class="v" style="font-size:18px">668.0万</div></div>
+        <div class="kpi"><h3>上游调用</h3><div class="v" style="font-size:18px">59</div></div>
+        <div class="kpi"><h3>客户端请求</h3><div class="v" style="font-size:18px">50</div></div>
+        <div class="kpi"><h3>平均每次</h3><div class="v" style="font-size:18px">11.3万</div></div>
+        <div class="kpi"><h3>无用量回报</h3><div class="v" style="font-size:18px">2</div></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;max-width:520px">
+        <div class="bar slim"><i style="width:31%"></i></div>
+        <span class="muted tok" style="font-size:12px">思考 token 79.2万，占输出 31%（上游按输出计费时这块也算钱）</span>
+      </div>
+    </div>
+
+    <div class="sect">
+      <div class="sect-head"><h3>近 30 天</h3><span class="sub">柱高 = 当日 token 合计</span></div>
+      <div class="chartbox" style="height:190px"><svg id="clChart" viewBox="0 0 1000 190" preserveAspectRatio="none"></svg><div class="chart-tip" id="clTip"></div></div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:44px" class="duo2">
+      <div class="sect">
+        <div class="sect-head"><h3>按模型</h3></div>
+        <div class="tbox"><table>
+          <thead><tr><th>模型</th><th class="num-r">输入</th><th class="num-r">输出</th><th class="num-r">合计</th></tr></thead>
+          <tbody>
+            <tr><td class="m">deepseek-v3.2</td><td class="num-r">182.4万</td><td class="num-r">98.2万</td><td class="num-r"><b>280.6万</b></td></tr>
+            <tr><td class="m">glm-5.2</td><td class="num-r">121.8万</td><td class="num-r">84.1万</td><td class="num-r"><b>205.9万</b></td></tr>
+            <tr><td class="m">kimi-k2</td><td class="num-r">108.4万</td><td class="num-r">73.1万</td><td class="num-r"><b>181.5万</b></td></tr>
+          </tbody></table></div>
+      </div>
+      <div class="sect">
+        <div class="sect-head"><h3>按账号</h3></div>
+        <div class="tbox"><table>
+          <thead><tr><th>账号</th><th class="num-r">输入</th><th class="num-r">输出</th><th class="num-r">合计</th></tr></thead>
+          <tbody>
+            <tr><td>dev@cline.local</td><td class="num-r">233.4万</td><td class="num-r">141.2万</td><td class="num-r"><b>374.6万</b></td></tr>
+            <tr><td class="muted">ID a1b2c3</td><td class="num-r">99.8万</td><td class="num-r">61.4万</td><td class="num-r"><b>161.2万</b></td></tr>
+            <tr><td class="muted">ID f8e7d6</td><td class="num-r">79.4万</td><td class="num-r">52.8万</td><td class="num-r"><b>132.2万</b></td></tr>
+          </tbody></table></div>
+      </div>
+    </div>
+
+    <div class="sect">
+      <div class="sect-head"><h3>统计说明</h3></div>
+      <ul class="facts" style="border-top:1px solid var(--line);padding:14px 2px 14px 34px">
+        <li><b>按上游调用计，不按消息数计。</b>免费额度用尽时会自动切号重试，你发一条消息可能真的打了 2~3 次上游，这几次都实打实消耗额度，所以都记上。上方的「重试放大」就是两者之比。</li>
+        <li>客户端中途断开（点停止、关页面）时上游还没来得及回报用量，这类会计入<b>无用量回报</b>，不会用字符数瞎估——估算值混进来会让整份数字失去意义。</li>
+        <li>统计只存在<b>当前实例内存</b>里，进程重启会清零。</li>
+        <li>上游按自然日的免费额度结算，所以「近 30 天」用的是本机时区的自然日。</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ================= 日志 ================= -->
+  <div class="tabpanel" id="tp-logs">
+    <div class="logsplit">
+      <div>
+        <div class="sect-head">
+          <h3>请求日志</h3><span class="sub">最近 60 条</span><span class="sp"></span>
+          <button class="btn xs">导出 JSON</button><button class="btn xs del">清空</button>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
+          <div class="seg" id="logFilter"><button class="on" data-f="all">全部 8</button><button data-f="ok">成功 7</button><button data-f="bad">失败 1</button><button data-f="slow">慢请求 0</button></div>
+          <input type="search" id="logSearch" placeholder="搜索模型" style="flex:1;max-width:180px">
+          <button class="btn xs" id="followBtn">跟随最新：开</button>
+        </div>
+        <div class="lrow lhead"><span>时间</span><span>模型</span><span>状态</span><span class="num-r">首字节</span><span class="num-r">速度</span><span class="num-r">总耗时</span></div>
+        <div id="logList"></div>
+      </div>
+      <div>
+        <div class="sect-head"><h3>条目详情</h3></div>
+        <div id="logDetail" style="border-top:1px solid var(--line);padding-top:6px">
+          <p class="faint" style="font-size:12.5px">点击左侧任意一行查看完整指标与原始报文。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 接入配置 ================= -->
+  <div class="tabpanel" id="tp-config">
+    <div class="sect">
+      <div class="sect-head"><h3>连接信息</h3></div>
+      <div class="tbox"><table><tbody>
+        <tr><td style="width:130px"><b>Base URL</b></td><td><span class="m" id="cBase">http://127.0.0.1:8787/v1</span> <button class="btn xs" data-copy="#cBase" style="margin-left:8px">复制</button></td></tr>
+        <tr><td><b>API Key</b></td><td><input type="password" value="cf_8a31b0c4d5e6f708" id="cKey" readonly style="width:220px;background:#f7f6f3">
+          <button class="btn xs" id="cKeyShow" style="margin-left:8px">显示</button>
+          <button class="btn xs" data-copy="#cKey">复制</button></td></tr>
+        <tr><td><b>当前模型</b></td><td><span class="m">cline-free/deepseek-v3.2</span> <button class="btn xs" data-copy-text="cline-free/deepseek-v3.2" style="margin-left:8px">复制</button></td></tr>
+      </tbody></table></div>
+      <p class="faint" style="font-size:11.5px;margin-top:8px">密钥只保存在本机浏览器。本地运行时由 local-server.js 自动生成并注入，无需手填；线上部署请在环境变量里设置。</p>
+    </div>
+
+    <div class="sect">
+      <div class="sect-head"><h3>接入须知</h3></div>
+      <ul class="facts" style="border-top:1px solid var(--line);padding:14px 2px 14px 34px">
+        <li>同时兼容 OpenAI（/v1/chat/completions）与 Anthropic（/v1/messages），两边官方 SDK 都能直连。</li>
+        <li>Cloudflare 的 workers.dev 域名按 User-Agent 拦请求，非浏览器 UA 可能得到 1010；改用 Vercel 域名或加浏览器 UA。</li>
+        <li>402 表示付费档余额不足，换带 :free 或 cline-free/ 的免费模型。</li>
+        <li>429 Daily free limit 是账号当日额度用尽，等冷却或追加账号自动切号。</li>
+        <li>服务端未配 API_KEY 时聊天端点返回 401，不会回退到公开默认密钥。</li>
+      </ul>
+    </div>
+
+    <div class="sect">
+      <div class="sect-head"><h3>客户端接入代码</h3><span class="sub">已填入上面的地址与密钥</span></div>
+      <div class="seg" id="snipTabs" style="margin-bottom:4px">
+        <button class="on" data-s="curl">cURL</button><button data-s="py">Python</button><button data-s="node">Node</button><button data-s="anthropic">Anthropic</button><button data-s="env">环境变量</button>
+      </div>
+      <pre class="snip" id="snipBox"></pre>
+      <div style="display:flex;align-items:center;gap:12px;margin-top:10px">
+        <button class="btn pri" id="snipCopy">复制这段代码</button>
+        <span class="faint" style="font-size:11.5px">填入 API Key 后会自动更新</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 上游渠道 ================= -->
+  <div class="tabpanel" id="tp-upstreams">
+    <div class="sect">
+      <div class="sect-head"><h3>按模型钉住上游渠道</h3><span class="sub">1 个模型已配置</span><span class="sp"></span><button class="btn xs">刷新</button></div>
+      <p class="muted" style="font-size:12.5px;line-height:1.8;border-top:1px solid var(--line);padding-top:14px">
+        留空 = 自动模式（由网关自己挑渠道并自带故障转移，实测最稳）。钉住用于：某个渠道总是坏、要优先用便宜/快的渠道、或想把模型 ID 重定向到新名字。只有探测过才知道这个模型走哪条管道，所以先点「探测」再钉。</p>
+      <div style="display:flex;gap:8px;margin:14px 0 26px">
+        <input type="text" list="modelIds" placeholder="模型 ID，例如 cline-free/deepseek-v4.1-flash" style="flex:1;max-width:420px">
+        <datalist id="modelIds"><option value="cline-free/deepseek-v4.1-flash"></option><option value="zai/glm-5.2"></option></datalist>
+        <button class="btn pri">添加配置</button>
+      </div>
+
+      <div class="acard" style="border-top-width:1px">
+        <div class="sect-head" style="margin-bottom:8px">
+          <b class="m" style="font-size:13px">cline-free/deepseek-v3.2</b>
+          <span class="st ok"><i></i>deepseek-free</span>
+          <span class="sp"></span>
+          <button class="btn xs">探测</button><button class="btn xs del">删除配置</button>
+        </div>
+        <div class="kv2" style="border-top:1px solid var(--line-soft);padding:10px 2px">
+          <div><div class="k">管道</div><div>deepseek-free</div></div>
+          <div><div class="k">实际命中</div><div>deepinfra</div></div>
+          <div><div class="k">钉住状态</div><div style="color:var(--ok)">✓ 钉住生效</div></div>
+          <div><div class="k">探测于</div><div class="m">6 小时前</div></div>
+        </div>
+        <div style="border-top:1px solid var(--line-soft);padding:10px 2px">
+          <div class="k faint" style="font-size:11px">可用渠道（5）</div>
+          <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">
+            <span class="chip">deepinfra</span><span class="chip">alibaba</span><span class="chip">novita</span><span class="chip">baseten</span><span class="chip">deepseek</span></div>
+        </div>
+        <div class="tbox" style="margin-top:10px"><table><tbody>
+          <tr><td style="width:250px"><b>钉住的渠道（逗号分隔，顺序即优先级）</b></td><td><input type="text" value="deepinfra, alibaba" style="width:100%;max-width:420px"></td></tr>
+          <tr><td><b>排除的渠道（逗号分隔）</b><div class="muted" style="font-size:11px">网关不认排除字段，所以会换算成白名单（依赖上面的可用渠道清单）。</div></td>
+              <td><input type="text" placeholder="例如 baseten, novita" style="width:100%;max-width:420px"></td></tr>
+          <tr><td><b>钉住模式</b></td>
+              <td><select style="width:340px"><option>preferred — 优先这些，允许回退</option><option>strict — 只用这些渠道，不回退</option></select></td></tr>
+          <tr><td><b>模型 ID 重定向（发给上游的真实 ID）</b></td><td><input type="text" placeholder="留空 = 原样透传" style="width:100%;max-width:420px"></td></tr>
+          <tr><td><b>别名（逗号分隔，同样适用本配置的其它模型 ID）</b></td><td><input type="text" placeholder="例如 my-glm, team/glm" style="width:100%;max-width:420px"></td></tr>
+        </tbody></table></div>
+        <div style="display:flex;align-items:center;gap:12px;margin-top:12px">
+          <button class="btn pri">保存</button>
+          <span class="faint" style="font-size:11.5px">管道：deepseek-free　探测结果会随保存一起保留，不必重探。</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 设置 ================= -->
+  <div class="tabpanel" id="tp-settings">
+    <div class="sect">
+      <div class="sect-head"><h3>调度</h3></div>
+      <div class="tbox"><table><tbody>
+        <tr><td style="width:220px"><b>轮换策略</b></td>
+            <td><select style="width:340px"><option>round_robin — 逐个轮换（默认）</option><option>fill — 先用满一个号，再换下一个</option><option>random — 随机挑一个</option></select></td></tr>
+        <tr><td><b>冷却兜底时长（分钟）</b><div class="muted" style="font-size:11.5px">只在上游没有给出重置时间时使用。上游给了就用上游的（免费模型按自然日，自动算到次日本地零点）。改这个值会清空现有冷却，让新配置立刻生效。</div></td>
+            <td><input type="number" value="30" min="1" max="1440" style="width:110px"></td></tr>
+        <tr><td><b>默认模型</b><div class="muted" style="font-size:11.5px">客户端请求里不带 model 字段时用它。</div></td>
+            <td><select style="width:340px"><option>（跟随列表第一个：cline-free/deepseek-v3.2）</option><option>zai/glm-5.2</option></select></td></tr>
+      </tbody></table></div>
+    </div>
+
+    <div class="sect">
+      <div class="sect-head"><h3>system prompt 覆盖</h3></div>
+      <div style="border-top:1px solid var(--line);padding-top:14px">
+        <textarea rows="5" placeholder="留空 = 用客户端自己的 system 提示"></textarea>
+        <p class="muted" style="font-size:12px;margin:8px 0 0">填了就<b>替换</b>客户端传来的 system 消息（位置不变，内容换成这里填的）。适用于给所有客户端统一注入一段行为约束。</p>
+      </div>
+    </div>
+
+    <div class="sect">
+      <div class="sect-head"><h3>自定义请求头</h3><span class="sp"></span><button class="btn xs">恢复默认</button></div>
+      <p class="muted" style="font-size:12px;margin:0 0 12px;border-top:1px solid var(--line);padding-top:12px">上游靠这些头识别「是不是 Cline 客户端」，<b>改动有风险</b>：填错会被 403（only available via Cline product surfaces）。一般只在客户端版本升级、上游要求新版本号时才需要改。留空的行不生效。</p>
+      <div class="tbox"><table><tbody>
+        <tr><td style="width:220px" class="m">User-Agent</td><td><input type="text" placeholder="cline-vscode/2.2" style="width:100%;max-width:360px"></td></tr>
+        <tr><td class="m">X-Cline-Version</td><td><input type="text" placeholder="2.2.31" style="width:100%;max-width:360px"></td></tr>
+        <tr><td class="m">X-API-Channel</td><td><input type="text" placeholder="vscode" style="width:100%;max-width:360px"></td></tr>
+      </tbody></table></div>
+    </div>
+
+    <div class="sect">
+      <div class="sect-head"><h3>保存</h3></div>
+      <div style="display:flex;align-items:center;gap:12px;border-top:1px solid var(--line);padding-top:14px">
+        <span class="faint" style="font-size:11.5px">读取于 16:03:12 · 设置在本地会自动存盘（~/.cline-free-state.local.json），重启不丢。</span>
+        <span style="flex:1"></span>
+        <button class="btn">放弃改动并重新读取</button>
+        <button class="btn pri" id="setSave">保存设置</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 登录（WorkOS 设备授权） -->
+<div class="veil" id="loginVeil" role="dialog" aria-modal="true">
+  <div class="modal" style="width:min(480px,calc(100vw - 40px))">
+    <h3>登录 Cline 账号 <button class="btn ghost xs" data-close style="float:right;margin-top:-4px">取消</button></h3>
+    <div id="loginReq"><p class="loading">正在申请授权码…<span class="cursor-blink"></span></p></div>
+    <div id="loginAuth" style="display:none">
+      <p style="font-size:13px">点下面按钮打开授权页面，登录 Cline 账号并确认。本页会自动检测结果。</p>
+      <div class="acts center" style="margin-top:12px">
+        <button class="btn pri" id="openAuthPage">打开授权页面</button>
+        <button class="btn">在本页打开</button>
+      </div>
+      <div class="linkbox" id="loginUrl">https://auth.cline.bot/device?user_code=ABCD-EFGH</div>
+      <p style="font-size:12.5px;margin:10px 0 6px">若页面要求输入设备码，即下面这串：</p>
+      <div style="font-family:var(--mono);font-size:22px;font-weight:700;letter-spacing:.12em;text-align:center;border:1px solid var(--line);border-radius:10px;padding:10px">ABCD-EFGH</div>
+      <div style="display:flex;justify-content:center;margin-top:10px"><button class="btn xs" data-copy-text="ABCD-EFGH">复制设备码</button></div>
+      <p class="muted" style="font-size:12.5px;text-align:center;margin-top:12px" id="pollText">等待授权…（剩余 480 秒）</p>
+      <div class="bar slim" style="max-width:220px;margin:8px auto 0"><i style="width:88%"></i></div>
+    </div>
+    <div id="loginDone" style="display:none">
+      <p style="font-size:13px;color:var(--ok);font-weight:600;margin:0 0 8px">登录成功：dev@cline.local，账号已加入账号池，可立即使用。</p>
+      <p class="muted" style="font-size:12.5px">该账号目前只在当前实例内存里，<b>重启或重新部署后会消失</b>。想长期保留，把下面这个 refreshToken 填进环境变量 CLINE_REFRESH_TOKEN：</p>
+      <div class="linkbox" id="rtVal">cf_rt_9f21c8e4a7b6d5c3e2f1_8a31b0c4d5e6f708_XX</div>
+      <div class="acts center">
+        <button class="btn pri" data-copy="#rtVal">复制 refreshToken</button>
+        <button class="btn" data-close>完成</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 账号详情 -->
+<div class="veil" id="detailVeil" role="dialog" aria-modal="true">
+  <div class="modal" style="width:min(620px,calc(100vw - 40px))">
+    <h3>账号详情 · dev@cline.local <button class="btn ghost xs" data-close style="float:right;margin-top:-4px">关闭</button></h3>
+    <div class="kv2" style="border-top:1px solid var(--line);padding:12px 2px">
+      <div><div class="k">状态</div><div>启用</div></div>
+      <div><div class="k">来源</div><div>控制台登录（已存盘）</div></div>
+      <div><div class="k">token 缓存</div><div>有</div></div>
+      <div><div class="k">兜底冷却时长</div><div>30 分钟</div></div>
+    </div>
+    <p style="font-size:12px;font-weight:650;margin:14px 0 6px">冷却中的模型（额度按「账号×模型」独立计算）</p>
+    <div class="tbox"><table>
+      <thead><tr><th>模型</th><th>原因</th><th>剩余</th><th>恢复时刻</th><th></th></tr></thead>
+      <tbody>
+        <tr><td class="m">zai/glm-5.2</td><td><span class="st warn"><i></i>免费日额度</span></td><td>12 分钟</td><td class="m">16:58</td>
+            <td class="num-r"><button class="btn xs" data-op="已解除冷却">解除冷却</button></td></tr>
+      </tbody>
+    </table></div>
+    <p style="font-size:12px;font-weight:650;margin:16px 0 6px">现在可用的模型（2）</p>
+    <div style="display:flex;gap:6px;flex-wrap:wrap"><span class="chip">cline-free/deepseek-v3.2</span><span class="chip">moonshot/kimi-k2</span></div>
+    <p style="font-size:12px;font-weight:650;margin:16px 0 6px">Token 用量（累计 / 今日）</p>
+    <div class="kv2">
+      <div><div class="k">输入</div><div class="m">233.4万 / 12.4万</div></div>
+      <div><div class="k">输出</div><div class="m">141.2万 / 8.1万</div></div>
+      <div><div class="k">合计</div><div class="m">374.6万 / 20.5万</div></div>
+      <div><div class="k">上游调用</div><div class="m">31 / 4</div></div>
+    </div>
+    <p style="font-size:12px;font-weight:650;margin:16px 0 6px">refreshToken</p>
+    <p class="muted" style="font-size:12px">默认只显示脱敏值。需要换机器部署或手工备份时点「显示」取完整值。</p>
+    <div class="linkbox" id="rtMask">cf_rt_9f21…708（脱敏）</div>
+    <div style="display:flex;gap:8px">
+      <button class="btn xs pri" id="revealRt">显示完整值</button>
+      <button class="btn xs" data-copy="#rtMask">复制</button>
+      <button class="btn xs" id="queryBalance">查询官方余额</button>
+    </div>
+    <div id="balBox" style="display:none" class="kv2" >
+      <div style="margin-top:12px"><div class="k">Credit 余额</div><div class="m">2.418317</div></div>
+      <div style="margin-top:12px"><div class="k">查询时刻</div><div class="m">16:03:41</div></div>
+      <div style="grid-column:1/-1" class="faint" >官方接口的原始值以微单位计，这里已按 ÷1e6 换算成面板上显示的 Credit。</div>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+<script>
+/* ================= 服务开关 ================= */
+var svcSwitch=$('#svcSwitch'),svcBadge=$('#svcBadge'),svcConfirm=$('#svcConfirm');
+svcSwitch.addEventListener('click',function(){
+  if(svcSwitch.getAttribute('aria-checked')==='true'){svcConfirm.style.display='flex'}
+  else bootMain();
+});
+$('#cfCancel').onclick=function(){svcConfirm.style.display='none'};
+$('#cfOk').onclick=function(){
+  svcConfirm.style.display='none';
+  svcSwitch.disabled=true;svcBadge.className='st stop';svcBadge.innerHTML='<i></i>停止中…';
+  setTimeout(function(){svcSwitch.setAttribute('aria-checked','false');svcSwitch.disabled=false;svcBadge.className='st stop';svcBadge.innerHTML='<i></i>已停止'},900);
+};
+function bootMain(){
+  svcSwitch.disabled=true;svcBadge.className='st boot';svcBadge.innerHTML='<i></i>启动中…';
+  setTimeout(function(){svcSwitch.disabled=false;svcSwitch.setAttribute('aria-checked','true');svcBadge.className='st run';svcBadge.innerHTML='<i></i>运行中'},1300);
+}
+$('#restartBtn').addEventListener('click',function(){
+  if(svcSwitch.getAttribute('aria-checked')!=='true')return bootMain();
+  svcSwitch.disabled=true;svcBadge.className='st boot';svcBadge.innerHTML='<i></i>重启中…';
+  setTimeout(function(){svcSwitch.disabled=false;svcBadge.className='st run';svcBadge.innerHTML='<i></i>运行中'},1400);
+});
+$('#refreshBtn').addEventListener('click',function(){toast('状态与模型已刷新','ok')});
+$('#setSave').addEventListener('click',function(){toast('设置已保存','ok')});
+$('#cKeyShow').addEventListener('click',function(){
+  var el=$('#cKey'),show=el.type==='password';el.type=show?'text':'password';this.textContent=show?'隐藏':'显示';
+});
+$('#revealRt').addEventListener('click',function(){
+  $('#rtMask').textContent='cf_rt_9f21c8e4a7b6d5c3e2f1_8a31b0c4d5e6f708_XX';
+  this.textContent='已显示';
+});
+$('#queryBalance').addEventListener('click',function(){
+  this.textContent='查询中';var b=this;
+  setTimeout(function(){b.textContent='查询官方余额';$('#balBox').style.display='grid'},700);
+});
+
+/* ================= 对话测试 ================= */
+var thread=$('#thread'),generating=false,stopFlag=false;
+function addBub(role,txt,stats){
+  $('#chatEmpty')&&$('#chatEmpty').remove();
+  var d=document.createElement('div');
+  d.className='bub '+(role==='user'?'':role==='err'?'err':'ai');
+  d.innerHTML='<span class="av">'+(role==='user'?'我':role==='err'?'!':'AI')+'</span><div class="bd"><div class="txt"></div>'+(stats?'<div class="stats">'+stats+'</div>':'')+'</div>';
+  d.querySelector('.txt').textContent=txt;
+  thread.appendChild(d);thread.scrollTop=thread.scrollHeight;
+  return d.querySelector('.txt');
+}
+$('#chatInput').addEventListener('keydown',function(e){
+  if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();$('#sendBtn').click()}
+});
+$('#sendBtn').addEventListener('click',function(){
+  var v=$('#chatInput').value.trim();
+  if(!v||generating)return;
+  $('#chatInput').value='';
+  addBub('user',v);
+  generating=true;stopFlag=false;
+  $('#sendBtn').style.display='none';$('#stopBtn').style.display='';
+  var t0=Date.now();
+  var txtEl=addBub('ai','');
+  var meta=txtEl.parentElement.querySelector('.stats');
+  meta.textContent='生成中';
+  var CANNED='这是 cline-free 的对话测试回复：请求会经网关选号后转发到上游。如果账号当日免费额度用尽，网关会自动切换到下一个可用账号并重试，你不需要做任何事。冷却中的模型会在恢复后自动回到可选列表。';
+  var i=0;
+  var timer=setInterval(function(){
+    if(stopFlag){clearInterval(timer);finish(true);return}
+    i+=3;
+    txtEl.textContent=CANNED.slice(0,i);
+    thread.scrollTop=thread.scrollHeight;
+    if(i>=CANNED.length){clearInterval(timer);finish(false)}
+  },60);
+  function finish(stopped){
+    generating=false;
+    $('#sendBtn').style.display='';$('#stopBtn').style.display='none';
+    var ms=Date.now()-t0;
+    var ttft=Math.round(ms*0.32);
+    var outTok=Math.round(CANNED.length*0.72);
+    meta.textContent=stopped?'已停止':'完成 · 首字节 '+ttft+'ms / 总耗时 '+ms+'ms';
+    meta.innerHTML+=stopped?'':' · <span title="思考过程折叠">思考过程 · 86 字</span>';
+    $('#csTtft').textContent=ttft+'ms';
+    $('#csGen').textContent=(ms-ttft)+'ms';
+    $('#csTotal').textContent=ms+'ms';
+    $('#csTps').textContent='≈'+(outTok/((ms-ttft)/1000)).toFixed(1)+' tok/s';
+    $('#csIn').textContent=fmtInt(Math.round(v.length*1.6));
+    $('#csOut').textContent=fmtInt(outTok);
+    $('#csFin').textContent=stopped?'stopped':'stop';
+  }
+});
+$('#stopBtn').addEventListener('click',function(){stopFlag=true});
+$('#clearChat').addEventListener('click',function(){
+  thread.innerHTML='<div class="empty" id="chatEmpty"><b>还没有消息。</b><span>在下面输入内容开始测试，多轮对话会自动带上上下文。</span></div>';
+});
+$('#exportChat').addEventListener('click',function(){toast('对话记录已复制为 Markdown','ok')});
+
+/* ================= 账号 ================= */
+var CACCTS=[
+  {i:1,mail:'dev@cline.local',src:'已存盘 · 控制台登录',st:'可用',stc:'ok',cool:'无',cache:'有',ok:28,bad:1,rate:'97%',tin:'233.4万',tout:'141.2万',last:'5 分钟前',id:'a1b2c3'},
+  {i:2,mail:'team@cline.local',src:'已存盘 · 控制台登录',st:'部分冷却',stc:'rate',cool:'免费日额度 · 12 分钟 · 1 个模型',cache:'有',ok:19,bad:4,rate:'83%',tin:'99.8万',tout:'61.4万',last:'18 分钟前',id:'f8e7d6'},
+  {i:3,mail:'账号 #3',src:'环境变量',st:'冷却中',stc:'rate',cool:'花费上限 · 2 小时 14 分钟',cache:'无',ok:8,bad:6,rate:'57%',tin:'79.4万',tout:'52.8万',last:'1 小时前',id:'c3d4e5'},
+  {i:4,mail:'账号 #4',src:'环境变量',st:'已停用',stc:'dis',cool:'—',cache:'无',ok:0,bad:0,rate:'—',tin:'0',tout:'0',last:'—',id:'9a8b7c',off:true}
+];
+$('#acctGrid').innerHTML=CACCTS.map(function(a){
+  return '<div class="acard"'+(a.off?' style="opacity:.6"':'')+'>'+
+    '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><b style="font-size:13.5px">'+a.i+'. '+a.mail+'</b>'+
+    '<span class="st '+a.stc+'"><i></i>'+a.st+'</span>'+(a.src.indexOf('控制台')>=0?'':'<span class="chip">临时</span>')+'<span class="sp" style="flex:1"></span>'+
+    '<span class="faint" style="font-size:11px">'+a.src+'</span></div>'+
+    '<div class="kv2" style="margin-top:10px">'+
+      '<div><div class="k">冷却（原因）</div><div>'+(a.off?'—':a.cool)+'</div></div>'+
+      '<div><div class="k">token 缓存</div><div>'+a.cache+'</div></div>'+
+      '<div><div class="k">成功 / 失败</div><div class="m">'+a.ok+' / '+a.bad+'</div></div>'+
+      '<div><div class="k">成功率</div><div class="m">'+a.rate+'</div></div>'+
+      '<div><div class="k">输入 token</div><div class="m">'+a.tin+'</div></div>'+
+      '<div><div class="k">输出 token</div><div class="m">'+a.tout+'</div></div>'+
+      '<div><div class="k">最后使用</div><div class="m">'+a.last+'</div></div>'+
+      '<div><div class="k">账号 ID</div><div class="m">'+a.id+'</div></div>'+
+    '</div>'+
+    '<div class="ops">'+
+      '<button class="btn xs" data-detail="'+a.i+'">详情</button>'+
+      '<button class="btn xs" data-op="余额已更新：2.418317 Credit">余额</button>'+
+      (a.off?'<button class="btn xs" data-op="已启用">启用</button>':'<button class="btn xs" data-op="已停用">停用</button>')+
+      '<button class="btn xs" data-op="已清除该账号所有模型的冷却与 token 缓存">重置冷却</button>'+
+      (a.src.indexOf('控制台')>=0?'<button class="btn xs del" title="从账号池移除（仅临时账号）" disabled style="opacity:.5">移除</button>':'')+
+    '</div></div>';
+}).join('');
+$('#acctGrid').addEventListener('click',function(e){
+  var b=e.target.closest('button');if(!b)return;
+  if(b.dataset.detail){openVeil($('#detailVeil'));return}
+});
+document.addEventListener('click',function(e){
+  var b=e.target.closest('[data-op]');
+  if(b){toast(b.dataset.op,'ok')}
+});
+$('#loginBtn').addEventListener('click',function(){
+  $('#loginReq').style.display='';$('#loginAuth').style.display='none';$('#loginDone').style.display='none';
+  openVeil($('#loginVeil'));
+  setTimeout(function(){
+    $('#loginReq').style.display='none';$('#loginAuth').style.display='';
+    var n=480,pt=$('#pollText');
+    var t=setInterval(function(){
+      if(!$('#loginVeil').classList.contains('show')){clearInterval(t);return}
+      n-=3;
+      if(n<=0){clearInterval(t);pt.textContent='授权超时，请重新登录。';return}
+      pt.textContent='等待授权…（剩余 '+n+' 秒）';
+    },900);
+    setTimeout(function(){
+      clearInterval(t);
+      $('#loginAuth').style.display='none';$('#loginDone').style.display='';
+      toast('账号已加入账号池（dev@cline.local）','ok');
+    },3600);
+  },900);
+});
+$('#openAuthPage').addEventListener('click',function(){toast('原型：实际环境将以原生 <a target=_blank> 打开授权页')});
+
+/* ================= 模型库 ================= */
+function mcard(id,name,ctx,tags,added){
+  return '<div class="mcard"><div style="min-width:0;flex:1"><b style="font-size:12.5px">'+name+'</b>'+(id!==name?' <span class="mid">'+id+'</span>':'')+
+    (ctx?' <span class="chip" title="上下文长度">'+ctx+'</span>':'')+
+    tags.map(function(t){return ' <span class="chip">'+t+'</span>'}).join('')+'</div>'+
+    '<button class="btn xs" data-check>检测</button>'+
+    '<button class="btn xs pri" data-add'+(added?' disabled':'')+'>＋ 添加</button>'+
+    '<button class="btn xs" data-copy-text="'+id+'">⧉ 复制</button></div>';
+}
+$('#grpDeepseek').innerHTML=
+  mcard('cline-free/deepseek-v3.2','DeepSeek V3.2','128K',['推荐','实测免费'],true)+
+  mcard('cline-free/deepseek-v3.2-thinking','DeepSeek V3.2 Thinking','128K',['实测免费'],false)+
+  mcard('cline-free/deepseek-r2','DeepSeek R2','128K',['免费'],false);
+$('#grpZai').innerHTML=
+  mcard('zai/glm-5.2','GLM 5.2','128K',['免费'],true)+
+  mcard('zai/glm-5.3-flash','GLM 5.3 Flash','128K',['免费'],true);
+$('#catList').innerHTML=
+  mcard('qwen/qwen3-coder-plus','Qwen3 Coder Plus','1M',['付费'],false)+
+  mcard('qwen/qwen3-235b','Qwen3 235B','128K',['云额度'],false)+
+  mcard('qwen/qwen3-coder-flash','Qwen3 Coder Flash','1M',['免费'],false)+
+  mcard('qwen/qwq-32b','QwQ 32B','128K',['未标价'],false);
+$('#catSearch').addEventListener('input',function(){
+  var q=this.value.trim();
+  var rows=$$('#catList .mcard');
+  var n=0;
+  rows.forEach(function(r){
+    var hit=!q||r.textContent.toLowerCase().indexOf(q.toLowerCase())>=0;
+    r.style.display=hit?'':'none';if(hit)n++;
+  });
+  $('#catCount').textContent=q?('匹配 '+n+' 个 / 共 4 个'):'446 个模型 · 17 个供应商';
+});
+$('#enabledList').innerHTML=
+  mcard('cline-free/deepseek-v3.2','DeepSeek V3.2','128K',['默认'],true).replace('data-add','data-remove2 style="display:none" data-add')+
+  '<div class="mcard"><div style="flex:1"><b style="font-size:12.5px">GLM 5.2</b> <span class="mid">zai/glm-5.2</span> <span class="chip">128K</span> <span class="chip">免费</span></div>'+
+  '<button class="btn xs" data-check>检测</button><button class="btn xs">设为默认</button><button class="btn xs" data-copy-text="zai/glm-5.2">⧉ 复制</button><button class="btn xs del">移除</button></div>'+
+  '<div class="mcard"><div style="flex:1"><b style="font-size:12.5px">Kimi K2</b> <span class="mid">moonshot/kimi-k2</span> <span class="chip">128K</span> <span class="chip">免费</span></div>'+
+  '<button class="btn xs" data-check>检测</button><button class="btn xs">设为默认</button><button class="btn xs" data-copy-text="moonshot/kimi-k2">⧉ 复制</button><button class="btn xs del">移除</button></div>';
+document.addEventListener('click',function(e){
+  var b=e.target.closest('[data-check]');
+  if(b){b.textContent='检测中';b.disabled=true;setTimeout(function(){b.textContent='重测';b.disabled=false;toast('检测完成：可用（1.02s · 38 tok/s）','ok')},1200);return}
+  var a=e.target.closest('[data-add]');
+  if(a&&!a.disabled){a.disabled=true;a.textContent='已添加';toast('已添加','ok')}
+});
+
+/* ================= 统计 ================= */
+var RG=$('#retryGrid');
+for(var i=0;i<40;i++){var s=document.createElement('i');if(i>=34)s.className='r';RG.appendChild(s)}
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+var DAYS=30;
+function gen(seed,base,amp){var r=mulberry32(seed),out=[];for(var i=0;i<DAYS;i++){var wk=(i%7===5||i%7===6)?.55:1;out.push(Math.round((base+amp*r())*wk*(0.75+0.25*Math.sin(i/4))))}return out}
+var CS=gen(77,220000,120000);
+var CLABELS=CS.map(function(_,i){return dayLabel(i,DAYS)});
+chart($('#clChart'),$('#clTip'),[{name:'cline',color:'#c07427',data:CS}],'area',CLABELS);
+
+/* ================= 日志 ================= */
+var CLOGS=[
+  {t:'16:03:41',m:'deepseek-v3.2',ok:true,ttft:'312ms',tps:'38.2 tok/s',total:'2.31s'},
+  {t:'16:03:12',m:'glm-5.2',ok:true,ttft:'188ms',tps:'41.6 tok/s',total:'1.02s'},
+  {t:'16:02:58',m:'kimi-k2',ok:true,ttft:'204ms',tps:'36.9 tok/s',total:'1.44s'},
+  {t:'16:02:31',m:'glm-5.2',ok:false,ttft:'96ms',tps:'—',total:'0.12s'},
+  {t:'16:02:07',m:'deepseek-v3.2',ok:true,ttft:'274ms',tps:'33.8 tok/s',total:'3.14s'},
+  {t:'16:01:44',m:'kimi-k2',ok:true,ttft:'241ms',tps:'35.0 tok/s',total:'2.62s'},
+  {t:'16:01:20',m:'deepseek-v3.2',ok:true,ttft:'298ms',tps:'31.2 tok/s',total:'1.38s'},
+  {t:'16:00:55',m:'glm-5.2',ok:true,ttft:'183ms',tps:'44.0 tok/s',total:'0.96s'}
+];
+function paintCLog(f,q){
+  $('#logList').innerHTML=CLOGS
+    .filter(function(r){return f==='all'||(f==='ok'?r.ok:f==='bad'?!r.ok:true)})
+    .filter(function(r){return !q||r.m.toLowerCase().indexOf(q)>=0})
+    .map(function(r,i){
+      return '<div class="lrow" data-i="'+i+'"><span class="muted">'+r.t+'</span><span>'+r.m+'</span>'+
+      '<span>'+(r.ok?'<span class="code s">成功</span>':'<span class="code b">失败 429</span>')+'</span>'+
+      '<span class="num-r muted">'+r.ttft+'</span><span class="num-r muted">'+r.tps+'</span><span class="num-r muted">'+r.total+'</span></div>';
+    }).join('');
+}
+paintCLog('all','');
+$('#logFilter').addEventListener('click',function(e){
+  var b=e.target.closest('button');if(!b)return;
+  this.querySelectorAll('button').forEach(function(x){x.classList.toggle('on',x===b)});
+  paintCLog(b.dataset.f,$('#logSearch').value.trim().toLowerCase());
+});
+$('#logSearch').addEventListener('input',function(){paintCLog($('#logFilter .on').dataset.f,this.value.trim().toLowerCase())});
+$('#followBtn').addEventListener('click',function(){this.textContent=this.textContent.endsWith('开')?'跟随最新：关':'跟随最新：开'});
+$('#logList').addEventListener('click',function(e){
+  var r=e.target.closest('.lrow');if(!r)return;
+  $$('#logList .lrow').forEach(function(x){x.classList.remove('sel')});r.classList.add('sel');
+  var d=CLOGS[+r.dataset.i];
+  $('#logDetail').innerHTML='<dl class="detail" style="margin:0">'+
+    '<dt>类型</dt><dd>对话</dd><dt>模式</dt><dd>流式</dd>'+
+    '<dt>状态</dt><dd>'+(d.ok?'成功':'失败 429')+'</dd>'+
+    '<dt>首字节</dt><dd>'+d.ttft+'</dd><dt>生成耗时</dt><dd>'+d.total+'</dd><dt>总耗时</dt><dd>'+d.total+'</dd>'+
+    '<dt>输出速度</dt><dd>'+d.tps+'</dd><dt>输入 token</dt><dd>1,604</dd><dt>输出 token</dt><dd>'+(d.ok?'12,847':'0')+'</dd>'+
+    '<dt>思考 token</dt><dd>'+(d.ok?'3,204':'—')+'</dd><dt>token 合计</dt><dd>'+(d.ok?'14,451':'1,604')+'</dd>'+
+    '<dt>输出字符</dt><dd>'+(d.ok?'5,912':'0')+'</dd><dt>结束原因</dt><dd>'+(d.ok?'stop':'—')+'</dd>'+
+    '<dt>时间</dt><dd>'+d.t+'</dd></dl>'+
+    (d.ok?'':'<p class="code b" style="display:block;margin-top:10px">错误：429 Daily free limit exceeded</p><p class="faint" style="font-size:11.5px">建议：等冷却或追加账号自动切号。</p>')+
+    '<p style="font-size:12px;font-weight:650;margin:14px 0 4px">请求体 <button class="btn ghost xs" data-copy-text=\'{"model":"deepseek-v3.2"}\'>复制</button></p>'+
+    '<pre class="snip" style="max-height:120px">{ "model": "cline-free/deepseek-v3.2", "messages": [{"role":"user","content":"你好"}], "stream": true }</pre>'+
+    '<p style="font-size:12px;font-weight:650;margin:12px 0 4px">原始响应 <button class="btn ghost xs" data-copy-text="...">复制</button></p>'+
+    '<pre class="snip" style="max-height:120px">data: {"choices":[{"delta":{"content":"这是…"}}]}</pre>';
+});
+
+/* ================= 接入配置代码 ================= */
+var SNIPS={
+  curl:'# 任何 OpenAI 兼容客户端都可以用\ncurl http://127.0.0.1:8787/v1/chat/completions \\\n  -H "Authorization: Bearer cf_8a31b0c4d5e6f708" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"model":"cline-free/deepseek-v3.2","messages":[{"role":"user","content":"你好"}],"stream":true}\'',
+  py:'from openai import OpenAI\n\nclient = OpenAI(\n    base_url="http://127.0.0.1:8787/v1",\n    api_key="cf_8a31b0c4d5e6f708",\n)\n\nresp = client.chat.completions.create(\n    model="cline-free/deepseek-v3.2",\n    messages=[{"role": "user", "content": "你好"}],\n)\nprint(resp.choices[0].message.content)\n\n# 流式\nstream = client.chat.completions.create(\n    model="cline-free/deepseek-v3.2",\n    messages=[{"role": "user", "content": "你好"}],\n    stream=True,\n)\nfor chunk in stream:\n    print(chunk.choices[0].delta.content or "", end="")',
+  node:'import OpenAI from "openai";\n\nconst client = new OpenAI({\n  baseURL: "http://127.0.0.1:8787/v1",\n  apiKey: "cf_8a31b0c4d5e6f708",\n});\n\nconst stream = await client.chat.completions.create({\n  model: "cline-free/deepseek-v3.2",\n  messages: [{ role: "user", content: "你好" }],\n  stream: true,\n});\nfor await (const chunk of stream) {\n  process.stdout.write(chunk.choices[0].delta.content ?? "");\n}',
+  anthropic:'# 本服务同时实现 Anthropic 协议：/v1/messages\nfrom anthropic import Anthropic\n\nclient = Anthropic(\n    base_url="http://127.0.0.1:8787",\n    api_key="cf_8a31b0c4d5e6f708",\n)\n\nmsg = client.messages.create(\n    model="cline-free/deepseek-v3.2",\n    max_tokens=1024,\n    messages=[{"role": "user", "content": "你好"}],\n)\nprint(msg.content[0].text)',
+  env:'# 通用 OpenAI 兼容变量，多数工具与 SDK 都认\nOPENAI_BASE_URL=http://127.0.0.1:8787/v1\nOPENAI_API_KEY=cf_8a31b0c4d5e6f708\n\n# 部分工具用这个名字\nOPENAI_API_BASE=http://127.0.0.1:8787/v1\n\n# Anthropic 兼容客户端\nANTHROPIC_BASE_URL=http://127.0.0.1:8787\nANTHROPIC_API_KEY=cf_8a31b0c4d5e6f708'
+};
+function showSnip(k){$('#snipBox').textContent=SNIPS[k]}
+showSnip('curl');
+$('#snipTabs').addEventListener('click',function(e){
+  var b=e.target.closest('button');if(!b)return;
+  this.querySelectorAll('button').forEach(function(x){x.classList.toggle('on',x===b)});
+  showSnip(b.dataset.s);
+});
+$('#snipCopy').addEventListener('click',function(){copyText($('#snipBox').textContent).then(()=>toast('已复制','ok'))});
+
+initTabs('#svcTabs');
+wireVeil($('#loginVeil'));wireVeil($('#detailVeil'));
+</script>
+</body>
+</html>

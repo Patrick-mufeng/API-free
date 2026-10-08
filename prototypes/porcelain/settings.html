@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>设置 · API-free</title>
+<link rel="stylesheet" href="theme.css">
+</head>
+<body>
+<div class="wrap">
+  <div class="pagehead"><h1>设置</h1><span class="sub">面板自身 · 保存立即写入 data/panel.json</span></div>
+
+  <div class="sect">
+    <div class="sect-head"><h3>面板偏好</h3></div>
+    <div class="tbox"><table>
+      <tbody>
+        <tr><td style="width:180px"><b>主题</b><div class="muted" style="font-size:11.5px">界面配色</div></td>
+            <td><div class="seg"><button class="on">浅色</button><button>深色</button><button>跟随系统</button></div></td></tr>
+        <tr><td><b>数据刷新频率</b><div class="muted" style="font-size:11.5px">统计与状态轮询间隔</div></td>
+            <td><select><option>10 秒</option><option selected>30 秒</option><option>1 分钟</option><option>5 分钟</option></select></td></tr>
+        <tr><td><b>面板端口</b><div class="muted" style="font-size:11.5px">修改后需重启面板</div></td>
+            <td><input type="text" value="9000" style="width:110px"> <span class="reboot-tag">需重启</span></td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="sect">
+    <div class="sect-head"><h3>服务注册表</h3><span class="sub">data/services.json · 改动需重启面板的项已标注</span><span class="sp"></span><button class="btn xs" id="regAdd">＋ 添加服务</button></div>
+    <div class="tbox"><table>
+      <thead><tr><th>服务 ID</th><th>目录</th><th style="width:90px">端口</th><th>启动命令</th><th>健康检查</th><th>鉴权来源</th><th style="width:80px"></th></tr></thead>
+      <tbody>
+        <tr><td class="m">workbuddy</td><td class="m">workbuddy-free-main</td><td>7863</td><td class="m">go run ./cmd/...</td><td class="m">/healthz</td><td>config.json → api_key</td><td class="num-r"><button class="btn xs" data-reg>编辑</button></td></tr>
+        <tr><td class="m">qoder</td><td class="m">Qoder-free-main</td><td>8210</td><td class="m">go run ./cmd/qoder-free</td><td class="m">/v1/models（带 key）</td><td>config.json → api_key</td><td class="num-r"><button class="btn xs" data-reg>编辑</button></td></tr>
+        <tr><td class="m">cline</td><td class="m">cline-free-main</td><td>8787</td><td class="m">node start.mjs</td><td class="m">/v1/health</td><td>.env.local → API_KEY</td><td class="num-r"><button class="btn xs" data-reg>编辑</button></td></tr>
+        <tr><td class="m">cmdgo</td><td class="m">cmdgo-bridge-main</td><td>11435</td><td class="m">node dist/index.js</td><td class="m">/health</td><td>~/.cmdgo-bridge/config.json → apiKey</td><td class="num-r"><button class="btn xs" data-reg>编辑</button></td></tr>
+      </tbody>
+    </table></div>
+    <p style="font-size:11.5px;color:var(--faint);margin-top:8px">cline 的端口只能用 <span class="m">PORT</span> 环境变量修改，由监督器注入。</p>
+  </div>
+
+  <div class="sect">
+    <div class="sect-head"><h3>进程监督</h3></div>
+    <div class="tbox"><table>
+      <tbody>
+        <tr><td style="width:180px"><b>崩溃自动拉起</b><div class="muted" style="font-size:11.5px">退出即检测，指数退避重启</div></td>
+            <td><button class="sw" role="switch" aria-checked="true" aria-label="崩溃自动拉起"></button></td></tr>
+        <tr><td><b>重启退避</b><div class="muted" style="font-size:11.5px">30s 起步，最长 10 分钟</div></td>
+            <td><input type="text" value="30s" style="width:110px"></td></tr>
+        <tr><td><b>PID 收编</b><div class="muted" style="font-size:11.5px">面板重启时探测已占端口的服务并纳入管理</div></td>
+            <td><button class="sw" role="switch" aria-checked="true" aria-label="PID 收编"></button></td></tr>
+        <tr><td><b>日志目录</b><div class="muted" style="font-size:11.5px">各服务 stdout 重定向位置</div></td>
+            <td><input type="text" value="panel\data\logs" style="width:220px"></td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="sect">
+    <div class="sect-head"><h3>关于</h3></div>
+    <div class="tbox"><table>
+      <tbody>
+        <tr><td style="width:180px"><b>面板版本</b></td><td class="m">v0.1.0（M0 原型）</td></tr>
+        <tr><td><b>服务版本探测</b></td><td class="muted" style="font-size:12.5px">workbuddy v1.8.2 · qoder v0.9.7 · cline v2.3.0 · cmdgo v0.4.1（示例）</td></tr>
+        <tr><td><b>统一 API 入口</b></td><td class="muted" style="font-size:12.5px">面板 v1 先不做（统一 base URL + 单 key），架构已预留</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:6px">
+    <button class="btn" id="discardBtn">放弃修改</button>
+    <button class="btn pri" id="saveBtn">保存设置</button>
+  </div>
+</div>
+<script src="app.js"></script>
+<script>
+$('#saveBtn').addEventListener('click',function(){toast('配置已保存','ok')});
+$('#discardBtn').addEventListener('click',function(){toast('已还原为上次保存的配置')});
+$('#regAdd').addEventListener('click',function(){toast('原型未实现：编辑 data/services.json 后重启面板','err')});
+$$('[data-reg]').forEach(function(b){b.addEventListener('click',function(){toast('原型未实现：注册表编辑将在 M1 接入','err')})});
+</script>
+</body>
+</html>

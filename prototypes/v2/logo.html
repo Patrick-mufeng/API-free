@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>API-free · logo 定稿</title>
+<link rel="stylesheet" href="assets/fonts.css">
+<style>
+  :root{
+    --ink:#17181A; --paper:#FFFFFF; --sunken:#F4F3F1; --line:#E6E4E0;
+    --muted:#6E6B66; --accent:#2E64F0;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;padding:44px 48px 72px;background:var(--sunken);color:var(--ink);
+       font:400 13.5px/1.65 var(--font-sans);-webkit-font-smoothing:antialiased}
+  h1{font-size:20px;font-weight:600;margin:0 0 6px;letter-spacing:-.015em}
+  .lede{color:var(--muted);margin:0 0 36px;max-width:74ch}
+  .card{background:var(--paper);border:1px solid var(--line);border-radius:18px;overflow:hidden;margin-bottom:20px}
+  .card > h2{margin:0;padding:15px 20px;font-size:13px;font-weight:600;border-bottom:1px solid var(--line);
+             display:flex;align-items:baseline;gap:10px}
+  .card > h2 em{font-style:normal;font-weight:400;font-size:11.5px;color:var(--muted)}
+  .row{display:flex;align-items:center;gap:26px;flex-wrap:wrap;padding:22px 20px;border-bottom:1px dashed #EFEDEA}
+  .row:last-child{border-bottom:0}
+  .row.dark{background:#101214;border-bottom-color:#232629}
+  .row.dark .cap{color:#8A9096}
+  .row.dark .lab{color:#C9CDD2}
+  .cap{font-size:10.5px;color:var(--muted);letter-spacing:.03em;text-transform:uppercase}
+  .lab{font-size:11px;color:var(--muted);text-align:center}
+  .sizes{display:flex;align-items:flex-end;gap:26px}
+  .sz{display:flex;flex-direction:column;align-items:center;gap:7px}
+  .grid2{display:grid;grid-template-columns:1.15fr .85fr;gap:20px}
+  .tile{display:inline-flex;align-items:center;justify-content:center;border-radius:22%;
+        background:#17181A;box-shadow:0 1px 3px rgba(20,24,32,.20)}
+  .tile.blue{background:linear-gradient(145deg,#2E64F0,#12B5C9)}
+  .tile.light{background:#fff;box-shadow:0 0 0 1px var(--line),0 1px 3px rgba(20,24,32,.10)}
+  .wordmark{display:flex;align-items:baseline;gap:9px}
+  .wordmark b{font-weight:600;font-size:19px;letter-spacing:-.022em}
+  .wordmark span{font-size:11.5px;color:var(--muted)}
+  .wl{display:flex;flex-direction:column;gap:12px}
+  svg.mark{display:block;color:var(--ink)}
+  .row.dark svg.mark{color:#F4F5F6}
+  ul{margin:8px 0 0;padding-left:18px;color:var(--muted);font-size:12px;line-height:1.75}
+  code{font-family:var(--font-mono);font-size:11.5px;background:#F1EFEC;padding:1px 5px;border-radius:4px}
+  .fav{display:flex;align-items:center;gap:14px}
+  .fav > span{border-radius:5px;overflow:hidden;box-shadow:0 0 0 1px rgba(0,0,0,.06)}
+</style>
+</head>
+<body>
+<h1>API-free · logo 定稿 —「两个梯子搭成的一个 A」</h1>
+<p class="lede">每条腿画成一把梯子：两条平行轨 + 垂直于轨的横档；两把梯子在顶点相靠；上半档两两对齐，正好连成 A 的横杠；脚底沿水平线切平，梯子是立在地上的。全部是精确几何（无贝塞尔），16px 下退化为一个干净的 A，40px 以上能看出两把梯子。</p>
+
+<div class="grid2">
+  <section class="card">
+    <h2>主标 mark <em>各尺寸 / 单色</em></h2>
+    <div class="row"><div class="sizes">
+      <span class="sz"><svg class="mark" width="128" height="128" viewBox="0 0 32 32"><use href="#m"/></svg><i class="lab">128</i></span>
+      <span class="sz"><svg class="mark" width="64" height="64" viewBox="0 0 32 32"><use href="#m"/></svg><i class="lab">64</i></span>
+      <span class="sz"><svg class="mark" width="40" height="40" viewBox="0 0 32 32"><use href="#m"/></svg><i class="lab">40</i></span>
+      <span class="sz"><svg class="mark" width="24" height="24" viewBox="0 0 32 32"><use href="#m"/></svg><i class="lab">24</i></span>
+      <span class="sz"><svg class="mark" width="16" height="16" viewBox="0 0 32 32"><use href="#m"/></svg><i class="lab">16</i></span>
+    </div></div>
+    <div class="row dark">
+      <span class="cap">深色底</span>
+      <svg class="mark" width="64" height="64" viewBox="0 0 32 32"><use href="#m"/></svg>
+      <svg class="mark" width="40" height="40" viewBox="0 0 32 32"><use href="#m"/></svg>
+      <svg class="mark" width="24" height="24" viewBox="0 0 32 32"><use href="#m"/></svg>
+      <svg class="mark" width="16" height="16" viewBox="0 0 32 32"><use href="#m"/></svg>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>图标底 favicon <em>方圆角 28%</em></h2>
+    <div class="row">
+      <span class="tile" style="width:96px;height:96px"><svg class="mark" width="58" height="58" viewBox="0 0 32 32" style="color:#fff"><use href="#m"/></svg></span>
+      <span class="tile" style="width:56px;height:56px"><svg class="mark" width="34" height="34" viewBox="0 0 32 32" style="color:#fff"><use href="#m"/></svg></span>
+      <span class="tile" style="width:32px;height:32px"><svg class="mark" width="19" height="19" viewBox="0 0 32 32" style="color:#fff"><use href="#m"/></svg></span>
+      <span class="tile" style="width:20px;height:20px"><svg class="mark" width="12" height="12" viewBox="0 0 32 32" style="color:#fff"><use href="#m"/></svg></span>
+    </div>
+    <div class="row">
+      <span class="cap">浮动彩底</span>
+      <span class="tile blue" style="width:56px;height:56px"><svg class="mark" width="34" height="34" viewBox="0 0 32 32" style="color:#fff"><use href="#m"/></svg></span>
+      <span class="tile light" style="width:56px;height:56px"><svg class="mark" width="34" height="34" viewBox="0 0 32 32"><use href="#m"/></svg></span>
+      <span style="margin-left:12px" class="fav">
+        <span><img src="assets/favicon.svg" width="16" height="16" alt=""></span>
+        <span><img src="assets/favicon.svg" width="20" height="20" alt=""></span>
+        <span><img src="assets/favicon.svg" width="32" height="32" alt=""></span>
+      </span>
+    </div>
+  </section>
+</div>
+
+<section class="card">
+  <h2>与字标组合 <em>三种排布</em></h2>
+  <div class="row">
+    <div class="wl">
+      <span class="wordmark"><svg class="mark" width="30" height="30" viewBox="0 0 32 32"><use href="#m"/></svg><b>API-free</b><span>统一面板</span></span>
+      <span class="wordmark"><svg class="mark" width="22" height="22" viewBox="0 0 32 32"><use href="#m"/></svg><b style="font-size:15px">API-free</b><span style="font-size:10.5px">统一面板</span></span>
+    </div>
+    <div class="wl">
+      <span style="display:flex;align-items:center;gap:11px">
+        <span class="tile" style="width:34px;height:34px;border-radius:10px"><svg class="mark" width="21" height="21" viewBox="0 0 32 32" style="color:#fff"><use href="#m"/></svg></span>
+        <span style="display:flex;flex-direction:column;line-height:1.25">
+          <b style="font-size:14px;font-weight:600;letter-spacing:-.01em">API-free</b>
+          <span style="font-size:10px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase">Unified Panel</span>
+        </span>
+      </span>
+    </div>
+  </div>
+</section>
+
+<section class="card">
+  <h2>几何说明 <em>可复现</em></h2>
+  <div class="row" style="display:block">
+    <ul>
+      <li>画布 <code>0 0 32 32</code>；顶点 <code>(16, 4.55)</code>，脚底水平线 <code>y = 27.6</code>，脚距 <code>x = 6.75 / 25.25</code>。</li>
+      <li>轨距（两轨中心距）<code>5.0</code>，轨宽 <code>2.3</code>，横档宽 <code>2.25</code>，横档位于轨长 <code>t = 0.335 / 0.70</code>。</li>
+      <li>上半档（t=0.335）两梯对齐 → A 的横杠由它自然形成，不是额外加的一根。</li>
+      <li>轨的上端垂直于轨身切、下端沿 <code>y</code> 水平切；全部是直线多边形，无曲线，位图渲染器可无损缩放。</li>
+      <li>单色 <code>currentColor</code>：浅色底用墨 <code>#17181A</code>，深色底用 <code>#F4F5F6</code>；图标底为墨底反白，或蓝→青渐变底。</li>
+    </ul>
+  </div>
+</section>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="m" viewBox="0 0 32 32">
+    <g fill="currentColor" stroke="currentColor" stroke-linejoin="miter" id="mk"></g>
+  </symbol>
+</svg>
+<script src="assets/logo-inner.js"></script>
+<script>
+  document.getElementById('mk').innerHTML = window.LOGO_INNER;
+</script>
+</body>
+</html>

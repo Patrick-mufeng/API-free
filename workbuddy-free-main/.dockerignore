@@ -1,0 +1,24 @@
+auths/
+data/
+*.tmp
+.git/
+.gitignore
+docs/
+scripts/__pycache__/
+# 根目录已提交/未提交的二进制产物不进构建上下文（与 .gitignore 对齐）
+# *.exe 兜底：否则 Dockerfile 的 COPY . . 会把约 36MB 的 Windows 二进制带进构建层
+*.exe
+/login
+/credit
+/wb2api
+/signin_bin
+# 本机启动辅助脚本不进镜像
+start-gateway.bat
+start-gateway.ps1
+stop-gateway.bat
+# 真实配置不进镜像（镜像默认用 config.example.json，生产以挂载卷覆盖）
+config.json
+PLAN.md
+SPEC.md
+LOOP.md
+README.md

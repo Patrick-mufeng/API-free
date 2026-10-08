@@ -1,0 +1,868 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>指挥台 · API-free</title>
+<link rel="stylesheet" href="assets/fonts.css">
+<style>
+/* ===========================================================================
+   D1 指挥台 Ops — 浅色精密仪表
+   设计读数：dashboard（不是 landing page），面向本机运维自己。
+     DESIGN_VARIANCE 3  · 对称 12 栏网格，不玩非对称
+     MOTION_INTENSITY 4 · 只有反馈与状态类动效，全部 <=180ms
+     VISUAL_DENSITY  9  · Cockpit：细线分隔、不用卡片盒、数据单元用等宽数字
+   结构靠细线 + 网格 + 字号阶梯，不靠阴影与圆角盒子。
+   =========================================================================== */
+:root{
+  --paper:#FFFFFF; --sunken:#F7F6F4; --ink:#16181A; --ink-2:#3D3B38;
+  --line:#E7E5E1; --line-2:#F0EEEB; --muted:#8A857E; --muted-2:#A8A39B;
+  --accent:#2E64F0; --ok:#1F9D5B; --warn:#C98A0B; --err:#CE3B2C;
+  --rail:56px; --topbar:52px;
+  --mono:var(--font-mono); --sans:var(--font-sans);
+  /* 形状阶梯：只有 3 档，全站一致 */
+  --r-sm:6px; --r-md:9px; --r-lg:12px;
+  /* 动效令牌 */
+  --ease-out:cubic-bezier(.23,1,.32,1);
+  --ease:cubic-bezier(.4,0,.2,1);
+  --dur-press:110ms; --dur-hover:140ms; --dur-state:180ms; --dur-view:150ms;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--paper);color:var(--ink);font:400 13px/1.6 var(--sans);
+  -webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;padding:0}
+h1,h2,h3,h4{margin:0;font-weight:500}
+.num{font-variant-numeric:tabular-nums}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.microlabel{font-size:10.5px;letter-spacing:.085em;text-transform:uppercase;color:var(--muted)}
+
+/* ---- 左侧图标栏 ---- */
+.rail{position:fixed;inset:0 auto 0 0;width:var(--rail);border-right:1px solid var(--line);
+  display:flex;flex-direction:column;align-items:center;padding:12px 0 14px;background:var(--paper);z-index:5}
+.rail .brand{width:30px;height:30px;color:var(--ink);margin-bottom:16px}
+.rail .brand svg{display:block;width:100%;height:100%}
+.rail nav{display:flex;flex-direction:column;gap:2px}
+.rail .ni{width:38px;height:38px;display:grid;place-items:center;border-radius:var(--r-md);color:var(--muted-2);position:relative;
+  transition:background-color var(--dur-hover) ease, color var(--dur-hover) ease}
+@media (hover:hover) and (pointer:fine){ .rail .ni:hover{color:var(--ink-2);background:var(--sunken)} }
+.rail .ni.on{color:var(--accent);background:#EEF3FE}
+.rail .ni.on::before{content:'';position:absolute;left:-12px;top:11px;width:2px;height:16px;border-radius:2px;background:var(--accent)}
+.rail .svcs{margin-top:auto;display:flex;flex-direction:column;gap:6px;align-items:center}
+.rail .svcs a{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;position:relative;
+  transition:opacity var(--dur-hover) ease}
+@media (hover:hover) and (pointer:fine){ .rail .svcs a:hover{opacity:.72} }
+.rail .svcs img{width:22px;height:22px;border-radius:6px;display:block}
+.rail .svcs a::after{content:'';position:absolute;right:-3px;bottom:3px;width:7px;height:7px;border-radius:50%;
+  background:var(--ok);box-shadow:0 0 0 2px var(--paper)}
+.rail .svcs a.off{filter:grayscale(1) opacity(.55)}
+.rail .svcs a.off::after{background:var(--muted)}
+
+/* ---- 顶栏 ---- */
+.top{position:fixed;top:0;left:var(--rail);right:0;height:var(--topbar);border-bottom:1px solid var(--line);
+  display:flex;align-items:center;gap:16px;padding:0 24px;background:rgba(255,255,255,.86);
+  backdrop-filter:blur(12px);z-index:4}
+.top h1{font-size:14.5px;font-weight:600;letter-spacing:-.005em}
+.top .sep{width:1px;height:18px;background:var(--line)}
+.top .meta{font-size:11.5px;color:var(--muted)}
+.top .right{margin-left:auto;display:flex;align-items:center;gap:14px}
+.cmtog{display:inline-flex;border:1px solid var(--line);border-radius:var(--r-sm);overflow:hidden;font-size:11px}
+.cmtog span{padding:3.5px 9px;color:var(--muted);transition:background-color var(--dur-state) var(--ease-out),color var(--dur-state) var(--ease-out)}
+.cmtog span.on{background:var(--ink);color:#fff}
+.live{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:var(--muted)}
+.live i{width:6px;height:6px;border-radius:50%;background:var(--ok)}
+/* 唯一的循环动效：运行指示的呼吸。它表达「在线且是活的」，不是装饰。 */
+@media (prefers-reduced-motion: no-preference){ .live i{animation:pulse 2.4s var(--ease) infinite} }
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+
+/* ---- 主体：12 栏网格，铺满整宽（之前 max-width 1560 在 1920 下留了 304px 死白） ---- */
+.stage{margin-left:var(--rail);padding-top:var(--topbar);min-height:100%}
+.wrap{padding:22px 24px 30px}
+.grid12{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:24px;align-items:start}
+.s7{grid-column:span 7} .s5{grid-column:span 5} .s4{grid-column:span 4} .s3{grid-column:span 3}
+.s12{grid-column:span 12}
+.rowgap{margin-top:22px}
+
+/* 视图切换：唯一的目的=避免内容瞬移（preventing a jarring change）。150ms，只做透明度 + 3px。 */
+@media (prefers-reduced-motion: no-preference){
+  .view-enter{animation:viewIn var(--dur-view) var(--ease-out)}
+  @keyframes viewIn{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+}
+
+/* ---- KPI 带 ---- */
+.band{display:grid;grid-template-columns:repeat(6,1fr);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.band .k{padding:14px 20px 15px;border-right:1px solid var(--line)}
+.band .k:last-child{border-right:0}
+.band .k .v{font-size:29px;font-weight:500;letter-spacing:-.022em;line-height:1.12;margin-top:8px}
+.band .k .v small{font-size:13px;font-weight:400;color:var(--muted);margin-left:5px;letter-spacing:0}
+.band .k .s{font-size:11.5px;color:var(--muted);margin-top:5px}
+.band .k .d{font-size:11.5px;color:var(--ok);margin-top:5px}
+.band .k .d.flat{color:var(--muted)}
+
+/* ---- 区块 ---- */
+.sect{border-top:1px solid var(--ink);padding-top:13px}
+.sect > header{display:flex;align-items:baseline;gap:10px;margin-bottom:13px}
+.sect > header h2{font-size:12px;letter-spacing:.02em;font-weight:600}
+.sect > header .sub{font-size:11px;color:var(--muted)}
+.sect > header .sp{margin-left:auto;display:flex;align-items:center;gap:10px}
+
+/* ---- 服务表 ---- */
+.svrows{border-top:1px solid var(--line)}
+.svhead,.svrow{display:grid;align-items:center;gap:14px;padding:0 6px}
+.svhead{grid-template-columns:26px minmax(0,1.5fr) 86px 62px 62px 84px 62px 104px 78px 46px;
+  padding-top:0;padding-bottom:7px;font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.svhead span.n{text-align:right}
+.svrow{grid-template-columns:26px minmax(0,1.5fr) 86px 62px 62px 84px 62px 104px 78px 46px;
+  padding-top:10px;padding-bottom:10px;border-bottom:1px solid var(--line-2);
+  transition:background-color var(--dur-hover) ease}
+@media (hover:hover) and (pointer:fine){ .svrow:hover{background:#FAF9F7} }
+.svrow img{width:22px;height:22px;border-radius:6px;display:block}
+.svrow .nm{font-weight:500;font-size:13px}
+.svrow .sub{font-size:11px;color:var(--muted);margin-top:1px}
+.svrow .cell{font-size:12px;color:var(--ink-2)}
+.svrow .n{text-align:right;font-family:var(--mono);font-size:12px;color:var(--ink-2)}
+.svrow .n.zero{color:var(--muted-2)}
+.sparkbar{display:block;height:22px}
+.chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--ink-2);white-space:nowrap}
+.chip i{width:6px;height:6px;border-radius:50%;background:currentColor;flex:none}
+.chip.ok{color:var(--ok)} .chip.off{color:var(--muted)} .chip.warn{color:var(--warn)} .chip.err{color:var(--err)}
+/* 开关：旋钮位置是 transform，回弹用强 ease-out */
+.sw{width:34px;height:19px;border-radius:10px;background:var(--ok);position:relative;justify-self:end;cursor:pointer;
+  transition:background-color var(--dur-state) var(--ease-out)}
+.sw::after{content:'';position:absolute;top:2px;right:2px;width:15px;height:15px;border-radius:50%;background:#fff;
+  box-shadow:0 1px 2px rgba(0,0,0,.18);transition:transform var(--dur-state) var(--ease-out)}
+.sw.off{background:#D8D4CF}
+.sw.off::after{transform:translateX(-15px)}
+
+/* ---- 图表 ---- */
+.chartbox{position:relative}
+.chartbox svg{display:block;width:100%;overflow:visible}
+.chartbox .axis{font-size:9.5px;fill:var(--muted-2);font-family:var(--sans)}
+.legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:10px}
+.legend span{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--muted)}
+.legend i{width:8px;height:8px;border-radius:2px}
+.note{font-size:11px;color:var(--muted);margin-top:10px;line-height:1.55}
+.sampletag{display:inline-block;padding:1.5px 7px;border-radius:5px;background:#FFF3D6;color:#8A6100;font-size:10.5px}
+/* 图表悬停读数：120ms 淡入，跟随鼠标用 transform（不触发重排）。
+   注意：这层必须放在图表容器【外面】—— autoChart 会用 innerHTML 重画容器，放里面会被冲掉。 */
+.chartwrap{position:relative}
+.crossline{position:absolute;top:0;bottom:0;width:1px;background:var(--muted-2);opacity:0;pointer-events:none;
+  transition:opacity 120ms var(--ease-out)}
+.tip{position:absolute;top:6px;pointer-events:none;background:#fff;border:1px solid var(--line);
+  border-radius:var(--r-sm);padding:7px 9px;box-shadow:0 4px 14px rgba(20,24,32,.10);opacity:0;
+  transition:opacity 120ms var(--ease-out);white-space:nowrap;z-index:2}
+.tip .d{font-size:10.5px;color:var(--muted);margin-bottom:4px}
+.tip .r{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--ink-2);line-height:1.7}
+.tip .r i{width:7px;height:7px;border-radius:2px;flex:none}
+.tip .r b{margin-left:auto;font-family:var(--mono);font-weight:400}
+
+/* ---- 账号池 ---- */
+.acct{display:flex;flex-direction:column;gap:12px}
+.acct .r{display:grid;grid-template-columns:26px minmax(0,1fr) auto;gap:11px;align-items:center}
+.acct .r img{width:20px;height:20px;border-radius:5px}
+.acct .nm{font-size:12.5px}
+.acct .sub{font-size:11px;color:var(--muted);margin-top:1px}
+.acct .v{font-family:var(--mono);font-size:12px;color:var(--ink-2);text-align:right}
+/* 进度条：宽度在渲染时写死、没有可动的状态，所以不挂过渡。
+   （声明一个永远不会发生的过渡等于「声称有动效但其实没有」） */
+.track{height:5px;border-radius:3px;background:var(--line);overflow:hidden;margin-top:6px}
+.track > i{display:block;height:100%;border-radius:3px;background:var(--ok)}
+
+/* ---- 构成条 ---- */
+.comp{display:flex;flex-direction:column;gap:13px}
+.comp .row{display:grid;grid-template-columns:74px minmax(0,1fr) 78px;gap:11px;align-items:center;font-size:12px}
+.comp .bar{display:flex;height:9px;border-radius:5px;overflow:hidden;background:var(--line)}
+.comp .bar > i{display:block;height:100%}
+.comp .bar > i.in{background:var(--accent)}
+.comp .bar > i.out{background:#9DB6F7}
+.comp .v{font-family:var(--mono);font-size:11.5px;color:var(--ink-2);text-align:right}
+
+/* ---- 事件流 ---- */
+.evrow{display:grid;grid-template-columns:56px 1fr;gap:12px;padding:8px 0;border-bottom:1px solid var(--line-2);font-size:12px}
+.evrow:last-child{border-bottom:0}
+.evrow time{color:var(--muted);font-family:var(--mono);font-size:11px}
+.evrow .m{color:var(--ink-2)}
+
+/* ---- 表格（统计/日志/设置） ---- */
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{text-align:left;font-weight:500;font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);
+  padding:0 10px 8px 0;border-bottom:1px solid var(--ink);white-space:nowrap}
+td{padding:9px 10px 9px 0;border-bottom:1px solid var(--line-2);color:var(--ink-2)}
+td.n,th.n{text-align:right;padding-right:16px;font-family:var(--mono)}
+td:last-child,th:last-child{padding-right:0}
+tr.hov{transition:background-color var(--dur-hover) ease}
+@media (hover:hover) and (pointer:fine){ tr.hov:hover td{background:#FAF9F7} }
+.hbar{height:5px;border-radius:3px;background:var(--line);position:relative;overflow:hidden}
+.hbar > i{position:absolute;inset:0 auto 0 0;border-radius:3px;background:var(--ink-2)}
+
+/* ---- 服务页头 + 页签 ---- */
+.svhead2{display:flex;align-items:center;gap:14px;padding-bottom:16px;border-bottom:1px solid var(--line)}
+.svhead2 img{width:34px;height:34px;border-radius:var(--r-md)}
+.svhead2 h2{font-size:16px;font-weight:600;letter-spacing:-.01em}
+.svhead2 .sub{font-size:11.5px;color:var(--muted);margin-top:2px}
+.svhead2 .acts{margin-left:auto;display:flex;align-items:center;gap:9px}
+.btn{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 11px;border:1px solid var(--line);
+  border-radius:var(--r-sm);font-size:12px;color:var(--ink-2);background:#fff;
+  transition:border-color var(--dur-hover) ease, transform var(--dur-press) var(--ease-out)}
+@media (hover:hover) and (pointer:fine){ .btn:hover{border-color:var(--muted-2)} }
+.btn:active{transform:translateY(.5px)}
+.btn.pri{background:var(--ink);color:#fff;border-color:var(--ink)}
+.tabs{display:flex;gap:0;border-bottom:1px solid var(--line);margin:18px 0 22px}
+.tabs button{padding:9px 15px;font-size:12.5px;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px;
+  transition:color var(--dur-hover) ease}
+@media (hover:hover) and (pointer:fine){ .tabs button:hover{color:var(--ink-2)} }
+.tabs button.on{color:var(--ink);border-bottom-color:var(--ink);font-weight:500}
+.cfg{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,290px));gap:14px 22px;justify-content:start}
+.cfg .f label{display:block;font-size:11px;color:var(--muted);margin-bottom:5px}
+.cfg .f .inp{height:32px;border:1px solid var(--line);border-radius:var(--r-sm);display:flex;align-items:center;
+  padding:0 10px;font-size:12px;background:#fff;color:var(--ink-2);font-family:var(--mono)}
+.cfg .f .hint{font-size:10.5px;color:var(--muted-2);margin-top:5px}
+.codeblk{background:var(--sunken);border:1px solid var(--line);border-radius:var(--r-md);padding:12px 14px;
+  font-family:var(--mono);font-size:11.5px;color:var(--ink-2);white-space:pre;overflow:auto;line-height:1.75}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:7px 16px;font-size:12px}
+.kv dt{color:var(--muted)} .kv dd{margin:0;color:var(--ink-2)} .kv code{font-family:var(--mono);font-size:11px}
+.empty{padding:26px 0;color:var(--muted);font-size:12.5px;line-height:1.7}
+
+/* ---- 底部信息带 ---- */
+.foot{display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:28px;border-top:1px solid var(--ink);padding-top:13px}
+.foot h3{font-size:11px;letter-spacing:.02em;font-weight:600;margin-bottom:11px}
+/* 可用模型：横排四项。做过一版 4 行表格，把 footer 顶到 268px、整页超出 1080，
+   而它只是参考资料不是仪表数据 —— 压平后整页正好一屏。 */
+.mrow2{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
+.mrow2 .i{display:flex;flex-direction:column;gap:6px}
+.mrow2 .t{display:flex;align-items:center;gap:7px;font-size:11.5px}
+.mrow2 .t img{width:16px;height:16px;border-radius:4px}
+.mrow2 .n{font-family:var(--mono);font-size:19px;letter-spacing:-.02em;line-height:1.1}
+.mrow2 .n.zero{color:var(--muted-2)}
+.mrow2 .s{font-size:10.5px;color:var(--muted);line-height:1.45}
+
+/* ---- 自适应：1512 以下收成两栏，1180 以下单栏 ---- */
+@media (max-width:1512px){
+  .s7,.s5{grid-column:span 12}
+  .s4,.s3{grid-column:span 6}
+  .band{grid-template-columns:repeat(3,1fr)}
+  .band .k:nth-child(3n){border-right:0}
+  .svhead,.svrow{grid-template-columns:26px minmax(0,1.4fr) 78px 56px 56px 76px 56px 46px}
+  .svhead .hide-md,.svrow .hide-md{display:none}
+}
+@media (max-width:1180px){
+  .s3,.s4{grid-column:span 12}
+  .band{grid-template-columns:repeat(2,1fr)}
+  .band .k:nth-child(2n){border-right:0}
+  .foot{grid-template-columns:1fr}
+  .mrow2{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .svhead{display:none}
+  .svrow{grid-template-columns:26px minmax(0,1fr) 74px 44px}
+  .svrow .hide-xs{display:none}
+}
+/* 减少动效：保留帮助理解的透明度与颜色变化，去掉所有位移与循环。
+   （不是「全部归零」——淡入与颜色反馈仍然有助于理解状态变化） */
+@media (prefers-reduced-motion: reduce){
+  .view-enter{animation:none}
+  .sw::after{transition:none}            /* 开关旋钮不做位移动画，直接跳到终态 */
+  .btn:active{transform:none}
+  .live i{animation:none}
+  .crossline,.tip{transition:opacity 80ms linear}
+}
+</style>
+</head>
+<body>
+<div class="rail">
+  <span class="brand" id="brand"></span>
+  <nav>
+    <button class="ni" data-nav="ov" title="总览" id="ni-ov"></button>
+    <button class="ni" data-nav="svc" title="服务" id="ni-svc"></button>
+    <button class="ni" data-nav="stats" title="统计" id="ni-stats"></button>
+    <button class="ni" data-nav="logs" title="日志" id="ni-logs"></button>
+    <button class="ni" data-nav="set" title="设置" id="ni-set"></button>
+  </nav>
+  <div class="svcs" id="railSvcs"></div>
+</div>
+<div class="top">
+  <h1 id="ttl">总览</h1><span class="sep"></span><span class="meta" id="sub"></span>
+  <div class="right">
+    <span class="live"><i></i>状态 3s · 统计 60s</span>
+    <span id="tog"></span>
+  </div>
+</div>
+<div class="stage"><div class="wrap" id="view"></div></div>
+
+<script src="assets/data.js"></script>
+<script src="assets/sample.js"></script>
+<script src="assets/logos.js"></script>
+<script src="assets/logo-inner.js"></script>
+<script src="assets/app.js"></script>
+<script>
+const D = window.DATA, SVC = D.services;
+const tok = fmt.tok, int = fmt.int;
+const $ = s => document.querySelector(s);
+const SERIES_ALL = () => chartSeries();
+
+document.getElementById('brand').innerHTML =
+  `<svg viewBox="0 0 32 32" fill="currentColor" stroke="currentColor" stroke-linejoin="miter">${window.LOGO_INNER}</svg>`;
+[['ni-ov','grid'],['ni-svc','server'],['ni-stats','bars'],['ni-logs','lines'],['ni-set','sliders']]
+  .forEach(([id,icn]) => document.getElementById(id).innerHTML = ic(icn,18));
+$('#tog').innerHTML = toggleChartHTML();
+$('#railSvcs').innerHTML = SVC.map(s =>
+  `<a href="#svc" class="${s.status==='running'?'':'off'}" title="${s.name} · :${s.port}" data-jump="${s.id}">${svcLogo(s.id,22)}</a>`).join('');
+
+/* 服务色（与数据台的分类色同源，用于构成条与迷你图） */
+const C = window.SVC_COLOR;
+
+/* ---------------- 派生量（全部由真实快照算出，不新造数据） ---------------- */
+const IN_OUT = D.summary.todayOut ? (D.summary.todayIn / D.summary.todayOut) : null;
+const T30 = ['cline','workbuddy','qoder','cmdgo'].reduce((a,k)=>{const t=D.totals30[k]||{};
+  a.tok += (t.input||0)+(t.output||0); a.reqs += (t.reqs||0); return a;}, {tok:0, reqs:0});
+const PREV = D.summary.prevTok || 0;   /* 10-06 的合计，快照里已算好 */
+
+/* ---------------- 图表：按容器实测宽度绘制 ---------------- */
+/* 趋势图：含悬停读数（鼠标移入显示该日分服务明细） */
+let trendGeo = null;
+autoChart('[data-chart="trend"]', (W,H)=>{
+  const series = SERIES_ALL();
+  const pad={l:44,r:16,t:16,b:24};
+  const split = chartMode()==='split';
+  const max = Math.max(1, ...series.map(d=>d.tok));
+  const X = i => pad.l + (i/(series.length-1))*(W-pad.l-pad.r);
+  const Y = v => H-pad.b - (v/max)*(H-pad.t-pad.b);
+  const pts = series.map((d,i)=>[X(i),Y(d.tok)]);
+  const si = series.findIndex(d=>d.reqs>0);
+  const ticks = [0,.5,1];
+  const head = split
+    ? ['cline','workbuddy','qoder','cmdgo'].map(k=>{
+        const p = series.map((d,i)=>[X(i),Y(d.by[k]||0)]);
+        return `<path d="${ch.line(p)}" fill="none" stroke="${C[k]}" stroke-width="1.5" stroke-linejoin="round"/>`; }).join('')
+    : `<path d="${ch.area(pts,H-pad.b)}" fill="${C.cline}" opacity=".08"/>
+       <path d="${ch.line(pts)}" fill="none" stroke="#16181A" stroke-width="1.4" stroke-linejoin="round"/>
+       ${series.map((d,i)=>d.reqs?`<circle cx="${X(i)}" cy="${Y(d.tok)}" r="2.6" fill="#16181A"/>`:'').join('')}`;
+  trendGeo = { X, Y, series, pad, W, H };
+  queueMicrotask(bindTrendHover);   // 画完即绑，避免在 paintCharts 之前绑定时 trendGeo 还是空的
+  return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">
+    ${ticks.map(f=>`<line x1="${pad.l}" x2="${W-pad.r}" y1="${Y(max*f)}" y2="${Y(max*f)}" stroke="#EFEDEA" stroke-dasharray="2 3"/>
+      <text class="axis" x="${pad.l-8}" y="${Y(max*f)+3.5}" text-anchor="end">${tok(max*f)}</text>`).join('')}
+    ${si>0?`<line x1="${X(si)}" x2="${X(si)}" y1="${pad.t-2}" y2="${H-pad.b}" stroke="#C9C5BF" stroke-dasharray="3 3"/>
+      <text class="axis" x="${X(si)+5}" y="${pad.t+6}">记录起点</text>`:''}
+    ${head}
+    <text class="axis" x="${pad.l}" y="${H-6}">${series[0].full}</text>
+    <text class="axis" x="${W-pad.r}" y="${H-6}" text-anchor="end">${series[series.length-1].full}</text>
+  </svg>`;
+});
+/* 每服务 30 天迷你趋势（真实逐日）。
+   曾在 104px 的格子里画 31 根柱（每根 1.35px），细到读不出趋势；
+   阶梯面积在这个尺寸下才能一眼看出「一直是 0、最后两天起来」。 */
+autoChart('[data-chart="spark"]', (W,H,el)=>{
+  const series = SERIES_ALL(), id = el.dataset.svc;
+  const vals = series.map(d=>d.by[id]||0);
+  const max = Math.max(1,...vals);
+  const n = vals.length, step = W/Math.max(1,n);
+  const y = v => (H-2) - (v/max)*(H-6);
+  // 阶梯折线，末尾回落到基线闭合成面积
+  let line = `M0 ${y(vals[0]).toFixed(1)}`;
+  vals.forEach((v,i)=>{ const x0=(i*step).toFixed(1), x1=((i+1)*step).toFixed(1), yy=y(v).toFixed(1);
+    line += `L${x0} ${yy}L${x1} ${yy}`; });
+  const zero = max<=1;   // 该服务 30 天完全没用量
+  return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">
+    <path d="${line}L${W} ${H}L0 ${H}Z" fill="${zero?'#EDEBE8':C[id]}" opacity="${zero?1:.32}"/>
+    <path d="${line}" fill="none" stroke="${zero?'#DDDAD5':C[id]}" stroke-width="1.4" stroke-linejoin="round"/>
+  </svg>`;
+});
+
+/* ---------------- 总览 ---------------- */
+function kpi(label, val, sub, delta){
+  return `<div class="k"><div class="microlabel">${label}</div>
+    <div class="v num">${val}</div>
+    ${delta?`<div class="d${delta.flat?' flat':''}">${delta.t}</div>`:''}
+    ${sub?`<div class="s">${sub}</div>`:''}</div>`;
+}
+function viewOverview(){
+  const s = D.summary, series = SERIES_ALL();
+  const delta = s.prevTok ? Math.round((s.todayTok - s.prevTok)/s.prevTok*100) : 0;
+  const split = chartMode()==='split';
+  return `
+  <div class="band">
+    ${kpi('今日 Tokens', tok(s.todayTok), null, {t:`${delta>=0?'+':''}${delta}% 较昨日 ${tok(PREV)}`})}
+    ${kpi('今日请求', `${int(s.todayReqs)}<small>次</small>`, `平均 ${Math.round(s.todayTok/Math.max(1,s.todayReqs))} tok / 次`)}
+    ${kpi('输入 / 输出', `${tok(s.todayIn)}<small>/ ${tok(s.todayOut)}</small>`, `输出占 ${s.todayTok?Math.round(s.todayOut/s.todayTok*100):0}%`, {t:IN_OUT?`比值 ${IN_OUT.toFixed(2)}`:'无数据', flat:true})}
+    ${kpi('活跃服务', `${s.active}<small>/ ${s.total}</small>`, '全部运行中')}
+    ${kpi('冷却中', `${s.cooling}`, '3 家已接入 · cmdgo 无此口径')}
+    ${kpi('30 天合计', tok(T30.tok), `${int(T30.reqs)} 次请求 · 自 ${series[0].full}`)}
+  </div>
+
+  <div class="grid12 rowgap">
+    <section class="sect s7">
+      <header><h2>服务</h2><span class="sub">点行进服务页</span>
+        <span class="sp"><span class="microlabel">4 个 · 全部运行中</span></span></header>
+      <div class="svhead">
+        <span></span><span>服务</span><span>进程</span><span class="n">账号</span><span class="n">模型</span>
+        <span class="n">今日 tok</span><span class="n">请求</span><span class="hide-md">30 天</span>
+        <span class="hide-md">状态</span><span></span>
+      </div>
+      <div class="svrows">${SVC.map(sv=>{
+        const t = D.todayBySvc[sv.id];
+        return `<div class="svrow" data-jsvc="${sv.id}" role="button" tabindex="0">
+          ${svcLogo(sv.id,22)}
+          <div><div class="nm">${sv.name}</div><div class="sub">:${sv.port} · ${sv.managed?'面板托管':'外部实例'}</div></div>
+          <div class="cell mono hide-xs" style="font-size:11px;color:var(--muted)">pid ${sv.pid}</div>
+          <div class="n hide-xs ${sv.accounts?'':'zero'}">${sv.accounts==null?'-':sv.accounts}</div>
+          <div class="n hide-xs ${sv.models?'':'zero'}">${sv.models==null?'-':sv.models}</div>
+          <div class="n ${t.tok?'':'zero'}">${t.tok?tok(t.tok):'-'}</div>
+          <div class="n hide-xs ${t.reqs?'':'zero'}">${t.reqs||'-'}</div>
+          <div class="hide-md"><span class="sparkbar" data-chart="spark" data-svc="${sv.id}" data-h="22"></span></div>
+          <div class="hide-md">${statusChip(sv.status)}</div>
+          <span class="sw" role="switch" aria-checked="true" aria-label="${sv.name} 开关"></span>
+        </div>`}).join('')}</div>
+      <div class="note">开关＝真·进程启停；面板托管的服务崩溃会指数退避自动拉起。「-」表示该服务当前这一项没有值，不是 0。</div>
+    </section>
+
+    <section class="sect s5">
+      <header><h2>用量趋势</h2><span class="sub">30 天 · 每日 Tokens</span>
+        <span class="sp">${sampleTag()}
+          <span class="cmtog" id="splitTog"><span class="${split?'':'on'}" data-split="0">全部</span><span class="${split?'on':''}" data-split="1">按服务分线</span></span>
+        </span></header>
+      <div class="chartwrap">
+        <div class="chartbox" data-chart="trend" data-h="252"></div>
+        <span class="crossline"></span><div class="tip"></div>
+      </div>
+      ${split?`<div class="legend">${['cline','workbuddy','qoder','cmdgo'].map(k=>`<span><i style="background:${C[k]}"></i>${SVC.find(x=>x.id===k).name}</span>`).join('')}</div>`:''}
+      <div class="note">统计自 ${series[0].full} 起收录，此前无记录；面板每 5 分钟拉取一次。真实快照只有两天有流量，切「示例密度」看数据密集时的形态。</div>
+    </section>
+  </div>
+
+  <div class="grid12 rowgap">
+    <section class="sect s4">
+      <header><h2>账号池</h2><span class="sub">4 个服务</span></header>
+      <div class="acct">
+        <div class="r">${svcLogo('workbuddy',20)}
+          <div><div class="nm">${D.wb.account.nickname}</div><div class="sub">国内 · 成功 ${D.wb.account.success_count} · 在途 ${D.wb.account.in_flight}</div></div>
+          <div class="v">${int(D.wb.account.credits)} / ${int(D.wb.account.credits_total)}</div>
+          <div style="grid-column:2 / -1"><div class="track"><i style="width:${(D.wb.account.credits/D.wb.account.credits_total*100).toFixed(1)}%"></i></div></div>
+        </div>
+        <div class="r">${svcLogo('cline',20)}
+          <div><div class="nm">${D.cline.account.email}</div><div class="sub">调用 ${D.cline.account.usage.calls} · 失败 ${D.cline.account.stats.fail} · 策略 ${D.cline.strategy}</div></div>
+          <div class="v">${tok(D.cline.account.usage.total)}</div>
+        </div>
+        <div class="r">${svcLogo('qoder',20)}
+          <div><div class="nm">未登录</div><div class="sub">账号池为空，设备授权登录后可入池</div></div>
+          <div class="v" style="color:var(--muted)">0 账号</div>
+        </div>
+        <div class="r">${svcLogo('cmdgo',20)}
+          <div><div class="nm">未授权</div><div class="sub">上游返回 MISSING_CREDENTIAL，需 OAuth</div></div>
+          <div class="v" style="color:var(--muted)">0 账号</div>
+        </div>
+      </div>
+      <div class="note">workbuddy 积分条为剩余 / 总额；cline 的累计是服务自身口径（重启清零）。</div>
+    </section>
+
+    <section class="sect s3">
+      <header><h2>今日构成</h2><span class="sub">输入 / 输出</span></header>
+      <div class="comp">
+        ${['workbuddy','cline','qoder','cmdgo'].map(k=>{
+          const t = D.todayBySvc[k], tot = Math.max(1, t.in + t.out);
+          const sv = SVC.find(x=>x.id===k);
+          return `<div class="row">
+            <span style="display:flex;align-items:center;gap:7px">${svcLogo(k,16)}<span style="font-size:11.5px">${sv.short}</span></span>
+            <span class="bar">${t.tok?`<i class="in" style="width:${(t.in/tot*100).toFixed(1)}%"></i><i class="out" style="width:${(t.out/tot*100).toFixed(1)}%"></i>`:''}</span>
+            <span class="v">${t.tok?int(t.in)+' / '+int(t.out):'-'}</span>
+          </div>`}).join('')}
+      </div>
+      <div class="legend"><span><i style="background:var(--accent)"></i>输入</span><span><i style="background:#9DB6F7"></i>输出</span></div>
+      <div class="note">今日只有 workbuddy 与 cline 产生用量；后两家账号未就绪，所以是空条。</div>
+    </section>
+
+    <section class="sect s5">
+      <header><h2>面板事件</h2><span class="sub">最近 ${D.events.length} 条</span>
+        <span class="sp"><span class="microlabel">启停 / 崩溃拉起 / 统计拉取</span></span></header>
+      ${D.events.map(e=>`<div class="evrow"><time>${e.t}</time><span class="m">${e.msg}</span></div>`).join('')}
+      <div class="note">只记面板自身动作。逐条请求流水四个服务都没有结构化接口，见各服务页「日志」页签。</div>
+    </section>
+  </div>
+
+  <div class="foot rowgap">
+    <section><h3>可用模型</h3>
+      <div class="mrow2">${SVC.map(s=>`<div class="i">
+        <div class="t">${svcLogo(s.id,16)}<span>${s.short}</span></div>
+        <div class="n ${s.models?'':'zero'}">${s.models==null?'-':s.models}</div>
+        <div class="s">${s.id==='workbuddy'?'能力表 17 条 · /v1/models 38 个':s.id==='cline'?'已启用 4 · 目录 400+':s.id==='qoder'?'随账号而来':'上游同步'}</div>
+      </div>`).join('')}</div>
+    </section>
+    <section><h3>接入入口</h3>
+      <dl class="kv">
+        <dt>经面板</dt><dd><code>${D.panel.addr}/api/svc/&lt;服务&gt;/v1</code></dd>
+        <dt>客户端密钥</dt><dd>随便填，面板会覆盖成真实密钥</dd>
+        <dt>直连</dt><dd><code>127.0.0.1:&lt;端口&gt;/v1</code> + 真钥</dd>
+      </dl>
+      <div class="note">四家仍是四个独立入口；没有「一个 base URL 调四家」的聚合入口。</div>
+    </section>
+    <section><h3>数据口径</h3>
+      <dl class="kv">
+        <dt>快照</dt><dd>${D.snapshotAt}</dd>
+        <dt>进程监督</dt><dd>30s 起指数退避，上限 10 分钟；面板外起的实例会被接管</dd>
+      </dl>
+      <div class="note">所有数字来自运行中的面板 API，没有占位假数据；趋势图可切「示例密度」查看密集形态，示例态会明确标注。</div>
+    </section>
+  </div>`;
+}
+
+/* 趋势图悬停读数：跟随鼠标，全部用 transform / opacity */
+function bindTrendHover(){
+  const box = document.querySelector('[data-chart="trend"]');
+  const wrap = box && box.closest('.chartwrap');
+  if (!box || !wrap || !trendGeo) return;
+  const line = wrap.querySelector('.crossline'), tip = wrap.querySelector('.tip');
+  if (!line || !tip || wrap._hb) return;
+  wrap._hb = 1;
+  wrap.addEventListener('mousemove', (e)=>{
+    const r = box.getBoundingClientRect();
+    const x = e.clientX - r.left;
+    const { X, series, pad, W } = trendGeo;
+    let best = 0, bd = 1e9;
+    series.forEach((d,i)=>{ const dd = Math.abs(X(i)-x); if (dd<bd){bd=dd; best=i;} });
+    const d = series[best], px = X(best);
+    line.style.transform = `translateX(${px}px)`;
+    line.style.opacity = '1';
+    tip.style.transform = `translateX(${Math.min(Math.max(px+12,0), W-190)}px)`;
+    tip.style.opacity = '1';
+    tip.innerHTML = `<div class="d">${d.full} · ${d.reqs} 次请求</div>` +
+      ['cline','workbuddy','qoder','cmdgo'].filter(k=>d.by[k]>0).map(k=>
+        `<div class="r"><i style="background:${C[k]}"></i>${SVC.find(s=>s.id===k).short}<b>${tok(d.by[k])}</b></div>`).join('') +
+      `<div class="r" style="border-top:1px solid var(--line);margin-top:4px;padding-top:4px">合计<b>${tok(d.tok)}</b></div>`;
+  });
+  wrap.addEventListener('mouseleave', ()=>{ line.style.opacity='0'; tip.style.opacity='0'; });
+}
+
+/* ---------------- 服务页 ---------------- */
+let curSvc = 'workbuddy', curTab = 'acct';
+const TABS = { workbuddy:[['acct','账号'],['tasks','任务中心'],['models','模型'],['usage','用量'],['logs','日志'],['access','接入'],['conf','设置']],
+  qoder:[['acct','账号'],['models','模型'],['usage','用量'],['logs','日志'],['access','接入'],['conf','设置']],
+  cline:[['acct','账号'],['models','模型库'],['usage','用量'],['logs','日志'],['access','接入'],['conf','设置']],
+  cmdgo:[['acct','账号'],['models','模型'],['usage','用量'],['logs','日志'],['access','接入'],['conf','设置']] };
+
+function acctPanel(id){
+  const sv = SVC.find(x=>x.id===id);
+  /* 账号统计条：全部取自快照里已有的字段，不新造口径 */
+  const strip = `<div class="band" style="grid-template-columns:repeat(6,1fr)">
+    ${kpi('账号总数', `${sv.accounts==null?'-':sv.accounts}`)}
+    ${kpi('可用', `${sv.healthy==null?'-':sv.healthy}`, sv.healthy?'全部可调度':'')}
+    ${kpi('冷却中', `${sv.cooling==null?'-':sv.cooling}`, sv.coolUnit?`单位：${sv.coolUnit}`:'')}
+    ${kpi('积分剩余', sv.credits?int(sv.credits.remaining):'-', sv.credits?`总额 ${int(sv.credits.total)}`:'该服务无积分口径')}
+    ${kpi('模型', `${sv.models==null?'-':sv.models}`, sv.id==='cline'?'已启用':'可调度')}
+    ${kpi('今日 Tokens', D.todayBySvc[id].tok?tok(D.todayBySvc[id].tok):'-', `${D.todayBySvc[id].reqs||0} 次请求`)}
+  </div>`;
+
+  if (id==='workbuddy'){ const a = D.wb.account, u = a.token_usage;
+    return strip + `
+    <section class="sect rowgap"><header><h2>账号</h2><span class="sub">1 个 · 可用</span></header>
+      <table><thead><tr><th>账号</th><th>UID</th><th class="n">积分</th><th class="n">成功</th><th class="n">在途</th><th class="n">熔断</th><th>状态</th></tr></thead>
+      <tbody><tr class="hov"><td>${a.nickname}</td><td class="mono" style="color:var(--muted);font-size:11px">${a.uid}</td>
+        <td class="n">${int(a.credits)} / ${int(a.credits_total)}</td><td class="n">${a.success_count}</td>
+        <td class="n">${a.in_flight}</td><td class="n">${a.breaker_fails}</td>
+        <td>${statusChip('running','可用')}</td></tr></tbody></table>
+      <div class="note">余额、状态、任务都在账号行内操作；「任务中心」页签是五个账号一起跑的批量闭环。</div>
+    </section>
+    <div class="grid12 rowgap">
+      <section class="sect s5"><header><h2>该账号用量</h2><span class="sub">进程内累计 · 重启清零</span></header>
+        <div class="cfg">
+          <div class="f"><label>请求数 / 计费次数</label><div class="inp">${u.request_count} / ${u.usage_count}</div></div>
+          <div class="f"><label>输入 Tokens</label><div class="inp">${int(u.prompt_tokens)}</div></div>
+          <div class="f"><label>输出 Tokens</label><div class="inp">${int(u.completion_tokens)}</div></div>
+          <div class="f"><label>合计 Tokens</label><div class="inp">${int(u.total_tokens)}</div></div>
+          <div class="f"><label>最近延迟</label><div class="inp">${u.last_latency_ms} ms</div></div>
+          <div class="f"><label>最近模型</label><div class="inp">${u.last_model}</div></div>
+        </div>
+        <div class="note">最近调用 ${fmt.ts(u.last_used_at)}。成功 ${a.success_count} 次、熔断 ${a.breaker_fails} 次、在途 ${a.in_flight}。</div>
+      </section>
+      <section class="sect s7"><header><h2>该服务 30 天用量</h2><span class="sub">每日 Tokens</span><span class="sp">${sampleTag()}</span></header>
+        <div class="chartbox" data-chart="usage" data-h="216"></div>
+        <div class="note">口径同统计页：以服务自身统计为准，面板按日搬运。</div>
+      </section>
+    </div>`;
+  }
+  if (id==='cline'){ const a = D.cline.account, u = a.usage;
+    return strip + `
+    <section class="sect rowgap"><header><h2>账号</h2><span class="sub">1 个 · 可用</span></header>
+      <table><thead><tr><th>账号</th><th>ID</th><th class="n">调用</th><th class="n">失败</th><th class="n">输入</th><th class="n">输出</th><th class="n">思考</th><th>状态</th></tr></thead>
+      <tbody><tr class="hov"><td>${a.email}</td><td class="mono" style="color:var(--muted);font-size:11px">${a.id}</td>
+        <td class="n">${u.calls}</td><td class="n">${a.stats.fail}</td><td class="n">${int(u.input)}</td>
+        <td class="n">${int(u.output)}</td><td class="n">${int(u.reasoning)}</td>
+        <td>${statusChip('running','可用')}</td></tr></tbody></table>
+      <div class="note">策略 ${D.cline.strategy} · 默认模型 ${D.cline.defaultModel}。冷却按模型级计算，可在账号详情里解除。</div>
+    </section>
+    <div class="grid12 rowgap">
+      <section class="sect s5"><header><h2>该账号用量</h2><span class="sub">服务自身累计 · 重启清零</span></header>
+        <div class="cfg">
+          <div class="f"><label>调用次数</label><div class="inp">${u.calls}</div></div>
+          <div class="f"><label>输入 Tokens</label><div class="inp">${int(u.input)}</div></div>
+          <div class="f"><label>输出 Tokens</label><div class="inp">${int(u.output)}</div></div>
+          <div class="f"><label>思考 Tokens</label><div class="inp">${int(u.reasoning)}</div></div>
+          <div class="f"><label>合计 Tokens</label><div class="inp">${int(u.total)}</div></div>
+          <div class="f"><label>成功 / 失败</label><div class="inp">${a.stats.ok} / ${a.stats.fail}</div></div>
+        </div>
+        <div class="note">最近调用 ${a.stats.last_used_at ? fmt.ts(new Date(a.stats.last_used_at).toISOString()) : '无记录'}。累计值与统计页的「按日差分」是两套口径，页面上都标注了。</div>
+      </section>
+      <section class="sect s7"><header><h2>该服务 30 天用量</h2><span class="sub">每日 Tokens</span><span class="sp">${sampleTag()}</span></header>
+        <div class="chartbox" data-chart="usage" data-h="216"></div>
+        <div class="note">口径同统计页：以服务自身统计为准，面板按日搬运。</div>
+      </section>
+    </div>`;
+  }
+  return strip + `<div class="empty">${id==='qoder'
+    ? '账号池为空。设备授权登录：账号页发起 → 浏览器打开授权链接 → 轮询入池。<br>没有账号时 /v1/models 返回 0 个模型，调用会报「没有可用账号」。'
+    : '需要先在自己的控制台完成 OAuth 登录（回调走本机 5959-5968 端口）。<br>上游 Command Code 当前返回 MISSING_CREDENTIAL，是授权未完成，不是配置错误。'}</div>`;
+}
+function modelsPanel(id){
+  if (id==='workbuddy') return `<table><thead><tr><th>模型</th><th class="n">积分倍率</th><th>默认档</th><th>支持的档位</th><th class="n">上下文</th><th class="n">最大输出</th></tr></thead>
+    <tbody>${D.wb.models.map(m=>`<tr class="hov"><td><b style="font-weight:500">${m.id}</b> <span style="color:var(--muted)">${m.name}</span></td>
+      <td class="n">${m.credits||'-'}</td><td>${m.effort}</td>
+      <td style="color:var(--muted)">${m.efforts?m.efforts.join(' / '):'固定档'}</td>
+      <td class="n">${(m.ctx/1000).toFixed(0)}K</td><td class="n">${(m.maxOut/1000).toFixed(0)}K</td></tr>`).join('')}</tbody></table>
+    <div class="note">面板能力表 ${D.wb.models.length} 条；/v1/models 另外暴露 38 个带 cn: / global: 前缀的 id，两个口径不同。</div>`;
+  if (id==='cline') return `<table><thead><tr><th>模型</th><th>来源</th><th class="n">上下文</th><th>状态</th></tr></thead>
+    <tbody>${D.cline.models.map(m=>`<tr class="hov"><td><b style="font-weight:500">${m.id}</b>${m.label?`<div style="font-size:11px;color:var(--muted)">${m.label}</div>`:''}</td>
+      <td class="mono" style="color:var(--muted)">${m.id.split('/')[0]}</td>
+      <td class="n">${m.ctx?(m.ctx/1048576).toFixed(0)+'M':'-'}</td>
+      <td>${m.default?'<span class="chip ok"><i></i>默认</span>':'<span class="chip"><i></i>已启用</span>'}</td></tr>`).join('')}</tbody></table>
+    <div class="note">只列已启用的 ${D.cline.models.length} 个；目录里还有 400+ 个可启用。</div>`;
+  if (id==='qoder') return `<div class="empty">模型目录随账号而来。账号池为空时 /v1/models 返回 0 个。</div>`;
+  return `<table><thead><tr><th>模型 id</th><th>来源</th></tr></thead><tbody>
+    ${D.cmdgo.modelList.map(m=>`<tr class="hov"><td class="mono">${m}</td><td style="color:var(--muted)">commandcode</td></tr>`).join('')}</tbody></table>
+    <div class="note">从上游同步，共 ${D.cmdgo.modelCount} 个（此处前 ${D.cmdgo.modelList.length} 个）。</div>`;
+}
+function usagePanel(id){
+  const t = D.todayBySvc[id], tt = D.totals30[id] || {input:0,output:0,reqs:0};
+  return `<div class="band" style="grid-template-columns:repeat(4,1fr)">
+      ${kpi('今日', t.tok?tok(t.tok):'-', `${t.reqs} 次请求`)}
+      ${kpi('30 天输入', tok(tt.input))}
+      ${kpi('30 天输出', tok(tt.output))}
+      ${kpi('30 天请求', int(tt.reqs))}
+    </div>
+    <section class="sect rowgap"><header><h2>消费节律</h2><span class="sub">每日 Tokens</span><span class="sp">${sampleTag()}</span></header>
+      <div class="chartbox" data-chart="usage" data-h="200"></div>
+      <div class="note">以服务自身统计为准；面板只按日搬运与差分。</div></section>`;
+}
+autoChart('[data-chart="usage"]', (W,H)=>{
+  const series = SERIES_ALL(), pad={l:44,r:16,t:16,b:24};
+  const vals = series.map(d=>d.by[curSvc]||0);
+  const max = Math.max(1,...vals);
+  const X = i => pad.l + (i/(series.length-1))*(W-pad.l-pad.r);
+  const Y = v => H-pad.b - (v/max)*(H-pad.t-pad.b);
+  const pts = vals.map((v,i)=>[X(i),Y(v)]);
+  return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">
+    ${[0,.5,1].map(f=>`<line x1="${pad.l}" x2="${W-pad.r}" y1="${Y(max*f)}" y2="${Y(max*f)}" stroke="#EFEDEA" stroke-dasharray="2 3"/>
+      <text class="axis" x="${pad.l-8}" y="${Y(max*f)+3.5}" text-anchor="end">${tok(max*f)}</text>`).join('')}
+    <path d="${ch.area(pts,H-pad.b)}" fill="${C[curSvc]}" opacity=".10"/>
+    <path d="${ch.line(pts)}" fill="none" stroke="${C[curSvc]}" stroke-width="1.5" stroke-linejoin="round"/>
+    ${vals.map((v,i)=>v?`<circle cx="${X(i)}" cy="${Y(v)}" r="2.6" fill="#fff" stroke="${C[curSvc]}" stroke-width="1.5"/>`:'').join('')}
+    <text class="axis" x="${pad.l}" y="${H-6}">${series[0].full}</text>
+    <text class="axis" x="${W-pad.r}" y="${H-6}" text-anchor="end">${series[series.length-1].full}</text>
+  </svg>`;
+});
+function taskPanel(){
+  const g = SVC.find(s=>s.id==='workbuddy').tasks.find(x=>x.name==='成长任务');
+  const school = SVC.find(s=>s.id==='workbuddy').tasks.find(x=>x.name==='开学季');
+  return `<section class="sect"><header><h2>开学季</h2><span class="sub">每日重置 · 五格为各任务进度</span>
+      <span class="sp"><span class="chip warn"><i></i>${school.note}</span></span></header>
+    <div class="note">当前不在活动期，五个任务槽位都显示未做。这与「没数据」不同。</div></section>
+  <section class="sect rowgap"><header><h2>成长任务</h2><span class="sub">${g.done} / ${g.total} 已领取</span></header>
+    <div style="display:flex;align-items:center;gap:14px;max-width:520px">
+      <div class="track" style="flex:1"><i style="width:${(g.done/g.total*100).toFixed(0)}%"></i></div>
+      <span class="mono" style="font-size:12px">${(g.done/g.total*100).toFixed(0)}%</span></div>
+    <div class="note">口径：accept_status == 'claimed' 记为已完成，与 current &gt;= target 完全一致（两种判据互证）。</div></section>
+  <section class="sect rowgap"><header><h2>成长任务队列</h2><span class="sub">按需扫描</span></header>
+    <div class="empty">还没有扫描过。点「扫描待办」会同步返回所有账号的成长任务与开学季待办，排成一列后一键执行。</div></section>`;
+}
+function logsPanel(id){
+  if (id!=='workbuddy' && id!=='qoder')
+    return `<div class="empty">${id==='cline'
+      ? 'cline 的请求日志只存在内存里，没有历史接口；真实用量见「用量」页签。'
+      : 'cmdgo 的访问日志在服务终端输出，管理事件见面板日志目录 data/logs/cmdgo.log。'}</div>`;
+  const lines = id==='workbuddy' ? [
+    ['13:33:14','sys','workbuddy-free listening on :7863 (api_key=true)'],
+    ['13:33:14','sys','scheduler: 余额后台刷新每 5m0s'],
+    ['14:33:19','sys','panel: 配置已保存（热生效完成；需重启 11 项）'],
+    ['14:50:27','sys','panel: 配置已保存（热生效完成；需重启 11 项）'],
+  ] : [['13:33:06','sys','qoder-free 0.1.0 listening on http://127.0.0.1:8210'],
+       ['13:33:07','sys','panel: api base: http://127.0.0.1:8210/v1']];
+  return `<section class="sect"><header><h2>运行日志</h2><span class="sub">最近 500 行 · 3s 轮询</span>
+      <span class="sp"><span class="live"><i></i>自动滚动：开</span></span></header>
+    <div class="codeblk">${lines.map(l=>`${l[0]} [${l[1]}] ${l[2]}`).join('\n')}</div>
+    <div class="note">接口返回的是 {entries:[{ts,ch,text}]}；这条 demo 用的是运行中面板的真实日志内容。</div></section>`;
+}
+function accessPanel(){
+  const sv = SVC.find(x=>x.id===curSvc);
+  return `<section class="sect"><header><h2>连接信息</h2></header>
+    <dl class="kv">
+      <dt>经面板（推荐）</dt><dd><code>${sv.panelBase}</code></dd>
+      <dt>直连服务</dt><dd><code>${sv.localBase}</code></dd>
+      <dt>API Key</dt><dd>${sv.keyMasked||'-'} <span style="color:var(--muted)">（默认脱敏，明文接口仅对本机开放）</span></dd>
+      <dt>协议</dt><dd>${sv.protocol.join(' · ')}</dd>
+      <dt>模型</dt><dd>${sv.models ? sv.models+' 个（'+sv.modelList.slice(0,2).join(', ')+(sv.models>2?' …':'')+'）' : '服务无可用账号，返回 0 个'}</dd>
+    </dl></section>
+  <section class="sect rowgap"><header><h2>客户端接入</h2><span class="sub">OpenAI SDK (Python)</span></header>
+    <div class="codeblk">from openai import OpenAI
+
+client = OpenAI(
+    base_url="${sv.panelBase}",
+    api_key="panel",              # 随便填，面板会覆盖成真实密钥
+)
+r = client.chat.completions.create(
+    model="${sv.modelList[0]||'<模型 id>'}",
+    messages=[{"role": "user", "content": "你好"}],
+)</div>
+    <div class="note">选「经面板」时密钥位写死占位，不用解锁明文就能直接跑通。</div></section>`;
+}
+const CONF = {
+  workbuddy:[['服务',[['listen','监听地址','0.0.0.0:7863'],['api_key','API 密钥','留空＝保持当前'],['log_level','日志级别','info']]],
+    ['定时任务',[['schedule.checkin_enabled','自动签到','true'],['schedule.checkin_hours','签到时间','9, 21'],['session_sticky.ttl','粘性会话 TTL','2h']]],
+    ['账号池与流量治理',[['pool.max_in_flight','单账号最大在途','3'],['breaker.fail_threshold','熔断失败阈值','5'],['stats.keep_days','统计保留天数','30']]],
+    ['上游与高级',[['prompt.mode','提示词模式','passthrough'],['sanitize.enabled','指纹脱敏','true']]]],
+  cline:[['服务',[['strategy','轮换策略','round_robin'],['cooldown_minutes','冷却兜底（分钟）','30'],['default_model','默认模型','deepseek/deepseek-v4-flash']]],
+    ['高级',[['override_prompt','system 覆盖','（未设置）'],['headers','自定义请求头','9 个']]]],
+  qoder:[['服务',[['listen','监听地址','127.0.0.1:8210'],['api_key','API 密钥','留空＝保持当前'],['region','默认区域','cn']]],
+    ['统计',[['stats.enabled','统计开关','true'],['stats.keep_days','保留天数','30']]]],
+  cmdgo:[['说明',[['__note','配置位置','~/.cmdgo-bridge/config.json'],['__note2','调用方式','见「接入」页签']]]],
+};
+function confPanel(){
+  return CONF[curSvc].map(([title,fields])=>`
+    <section class="sect"><header><h2>${title}</h2></header>
+      <div class="cfg">${fields.map(([k,l,v])=>`
+        <div class="f"><label>${l}</label><div class="inp">${v}</div>
+          <div class="hint">${k.startsWith('__')?'':k}</div></div>`).join('')}</div>
+    </section>`).join('');
+}
+function viewService(){
+  const sv = SVC.find(x=>x.id===curSvc);
+  const body = { acct:()=>acctPanel(curSvc), models:()=>modelsPanel(curSvc), usage:()=>usagePanel(curSvc),
+    tasks:()=>taskPanel(), logs:()=>logsPanel(curSvc), access:()=>accessPanel(), conf:()=>confPanel() }[curTab] || (()=>'');
+  return `
+  <div class="svhead2">${svcLogo(curSvc,34)}
+    <div><h2>${sv.name} ${statusChip(sv.status)}</h2>
+      <div class="sub">:${sv.port} · ${sv.managed?'面板托管':'外部实例'} · PID ${sv.pid} · 累计自动重启 ${sv.restarts} 次</div></div>
+    <div class="acts">
+      <button class="btn">${ic('ext',14)} 打开原面板</button>
+      <button class="btn">${ic('refresh',14)} 重启</button>
+      <span class="sw" role="switch" aria-checked="true"></span></div>
+  </div>
+  <div class="tabs">${TABS[curSvc].map(([k,l])=>`<button class="${curTab===k?'on':''}" data-tab="${k}">${l}</button>`).join('')}</div>
+  ${body()}`;
+}
+
+/* ---------------- 统计 ---------------- */
+function viewStats(){
+  const series = SERIES_ALL();
+  const rows = ['workbuddy','qoder','cline','cmdgo'].map(id=>{
+    const t = D.totals30[id] || {input:0,output:0,reqs:0};
+    return { id, name: SVC.find(s=>s.id===id).name, tok:(t.input||0)+(t.output||0), reqs:t.reqs||0,
+      today: D.todayBySvc[id].tok };
+  }).sort((a,b)=>b.tok-a.tok);
+  const maxTok = Math.max(1,...rows.map(r=>r.tok));
+  return `
+  <div class="band" style="grid-template-columns:repeat(4,1fr)">
+    ${kpi('30 天 Tokens', tok(T30.tok), `cline 为主要来源`)}
+    ${kpi('30 天请求', int(T30.reqs), `平均 ${int(T30.tok/Math.max(1,T30.reqs))} tok / 次`)}
+    ${kpi('收录天数', `${series.length}<small>天</small>`, `自 ${series[0].full} 起`)}
+    ${kpi('有流量天数', `${series.filter(d=>d.reqs>0).length}<small>天</small>`, '其余日期无记录')}
+  </div>
+  <div class="grid12 rowgap">
+    <section class="sect s7"><header><h2>四服务对比趋势</h2><span class="sub">按服务分线，共用同一比例尺</span>
+      <span class="sp">${sampleTag()}</span></header>
+      <div class="chartbox" data-chart="stack" data-h="240"></div>
+      <div class="legend">${['cline','workbuddy','qoder','cmdgo'].map(k=>`<span><i style="background:${C[k]}"></i>${SVC.find(s=>s.id===k).name}</span>`).join('')}</div>
+      <div class="note">四条线共用比例尺，否则失败线会各自归一化后在图上乱跳。</div></section>
+    <section class="sect s5"><header><h2>按服务排行</h2><span class="sub">30 天 Tokens</span></header>
+      ${rows.map(r=>`<div style="margin-bottom:14px">
+        <div style="display:flex;align-items:baseline;gap:8px;font-size:12px;margin-bottom:6px">
+          <span style="display:inline-flex;align-items:center;gap:7px">${svcLogo(r.id,16)}<span style="font-weight:500">${r.name}</span></span>
+          <span style="margin-left:auto;color:var(--muted)" class="mono">${int(r.reqs)} 次</span>
+          <span class="mono" style="width:70px;text-align:right">${tok(r.tok)}</span></div>
+        <div class="hbar"><i style="width:${(r.tok/maxTok*100).toFixed(1)}%;background:${C[r.id]}"></i></div></div>`).join('')}
+      <div class="note">qoder 与 cmdgo 为 0 是账号 / 授权未就绪，不是统计故障。</div></section>
+  </div>
+  <section class="sect rowgap"><header><h2>逐日明细</h2><span class="sub">日期 × 服务</span></header>
+    <table><thead><tr><th>日期</th><th class="n">输入</th><th class="n">输出</th><th class="n">合计</th><th class="n">请求</th><th>产生用量的服务</th></tr></thead><tbody>
+      ${series.filter(d=>d.reqs>0).map(d=>`<tr class="hov"><td class="mono">${d.full}</td><td class="n">${int(d.in)}</td><td class="n">${int(d.out)}</td>
+        <td class="n" style="color:var(--ink)">${int(d.tok)}</td><td class="n">${d.reqs}</td>
+        <td>${['cline','workbuddy'].filter(k=>d.by[k]>0).map(k=>SVC.find(s=>s.id===k).short).join(' · ')}</td></tr>`).join('')}
+      ${series.filter(d=>d.reqs>0).length===0?'<tr><td colspan="6" style="color:var(--muted)">该区间没有产生用量</td></tr>':''}
+    </tbody></table>
+    <div class="note">口径：以各服务自身统计为准，面板只做搬运与按日差分。</div></section>`;
+}
+autoChart('[data-chart="stack"]', (W,H)=>{
+  const series = SERIES_ALL(), pad={l:44,r:16,t:16,b:24};
+  const keys = ['cline','workbuddy','qoder','cmdgo'];
+  const max = Math.max(1, ...series.map(d=>keys.reduce((s,k)=>s+(d.by[k]||0),0)));
+  const X = i => pad.l + (i/(series.length-1))*(W-pad.l-pad.r);
+  const Y = v => H-pad.b - (v/max)*(H-pad.t-pad.b);
+  return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">
+    ${[0,.5,1].map(f=>`<line x1="${pad.l}" x2="${W-pad.r}" y1="${Y(max*f)}" y2="${Y(max*f)}" stroke="#EFEDEA" stroke-dasharray="2 3"/>
+      <text class="axis" x="${pad.l-8}" y="${Y(max*f)+3.5}" text-anchor="end">${tok(max*f)}</text>`).join('')}
+    ${keys.map(k=>{ const p = series.map((d,i)=>[X(i),Y(d.by[k]||0)]);
+      return `<path d="${ch.line(p)}" fill="none" stroke="${C[k]}" stroke-width="1.5" stroke-linejoin="round"/>`; }).join('')}
+    <text class="axis" x="${pad.l}" y="${H-6}">${series[0].full}</text>
+    <text class="axis" x="${W-pad.r}" y="${H-6}" text-anchor="end">${series[series.length-1].full}</text>
+  </svg>`;
+});
+
+/* ---------------- 日志 / 设置 ---------------- */
+function viewLogs(){
+  return `<section class="sect"><header><h2>面板事件</h2><span class="sub">启停 / 崩溃拉起 / 统计拉取</span></header>
+    ${D.events.map(e=>`<div class="evrow"><time>${e.t}</time><span class="m">${e.msg}</span></div>`).join('')}
+    <div class="note">面板事件来自内存环形缓冲；服务自身的运行日志在各自服务页的「日志」页签。四个服务都没有逐条请求的结构化接口，所以这里不做跨服务的请求流水。</div></section>
+  <section class="sect rowgap"><header><h2>服务运行日志</h2><span class="sub">按服务查看</span></header>
+    <div class="cfg">${SVC.map(s=>`<div class="f"><label>${s.name}</label>
+      <div class="inp" style="font-family:var(--sans)">${s.id==='workbuddy'?'4 条':s.id==='qoder'?'2 条':'该服务无日志接口'}</div>
+      <div class="hint">:${s.port}</div></div>`).join('')}</div></section>`;
+}
+function viewSet(){
+  return `<div class="grid12">
+    <section class="sect s7"><header><h2>面板偏好</h2></header>
+      <div class="cfg">
+        <div class="f"><label>面板监听</label><div class="inp">127.0.0.1:9000</div><div class="hint">改地址需重启面板</div></div>
+        <div class="f"><label>状态轮询</label><div class="inp">3s</div><div class="hint">总览与侧栏状态</div></div>
+        <div class="f"><label>统计轮询</label><div class="inp">60s</div><div class="hint">面板聚合库拉取间隔</div></div>
+        <div class="f"><label>崩溃拉起</label><div class="inp">30s → 10m</div><div class="hint">指数退避</div></div>
+      </div></section>
+    <section class="sect s5"><header><h2>关于</h2></header>
+      <dl class="kv"><dt>面板</dt><dd>API-free 统一面板 · 监督 4 个服务</dd>
+        <dt>快照</dt><dd>${D.snapshotAt}</dd>
+        <dt>接入入口</dt><dd><code>/api/svc/&lt;id&gt;/v1</code></dd>
+        <dt>聚合入口</dt><dd>未实现（四家各自独立）</dd></dl></section>
+  </div>
+  <section class="sect rowgap"><header><h2>服务注册表</h2><span class="sub">含每家的鉴权来源</span></header>
+    <table><thead><tr><th>服务</th><th class="n">端口</th><th>启动</th><th>鉴权来源</th></tr></thead><tbody>
+      ${SVC.map(s=>`<tr class="hov"><td><span style="display:inline-flex;align-items:center;gap:8px">${svcLogo(s.id,16)}${s.name}</span></td>
+        <td class="n">${s.port}</td>
+        <td class="mono" style="font-size:11px">${s.id==='workbuddy'?'go run ./cmd/server':s.id==='qoder'?'bin\\qoder-free.exe':s.id==='cline'?'node start.mjs (PORT=8787)':'node dist/index.js'}</td>
+        <td class="mono" style="font-size:11px;color:var(--muted)">${s.id==='workbuddy'||s.id==='qoder'?'config.json → api_key':s.id==='cline'?'.env.local → API_KEY':'~/.cmdgo-bridge/config.json → apiKey'}</td></tr>`).join('')}
+    </tbody></table></section>`;
+}
+
+/* ---------------- 路由 ---------------- */
+const VIEWS = { ov:viewOverview, svc:viewService, stats:viewStats, logs:viewLogs, set:viewSet };
+const TITLE = { ov:'总览', svc:'服务', stats:'统计', logs:'日志', set:'设置' };
+const SUB = { ov:'服务状态 · 用量趋势 · 账号池 · 面板事件', svc:'账号 · 模型 · 用量 · 日志 · 接入 · 设置',
+  stats:'跨服务用量聚合', logs:'面板事件与服务运行日志', set:'面板偏好与服务注册表' };
+
+mountRouter(VIEWS, (act)=>{
+  const view = document.getElementById('view');
+  document.getElementById('ttl').textContent = TITLE[act];
+  document.getElementById('sub').textContent = SUB[act];
+  /* 视图进入：避免内容瞬移。150ms、只做透明度 + 3px；reduce 下自动关闭。 */
+  view.classList.remove('view-enter'); void view.offsetWidth; view.classList.add('view-enter');
+  view.querySelectorAll('[data-tab]').forEach(b=>{ if(!b._b){b._b=1;b.addEventListener('click',()=>{curTab=b.dataset.tab;window.__go()})} });
+  view.querySelectorAll('[data-jsvc]').forEach(r=>{
+    const open = ()=>{ curSvc=r.dataset.jsvc; curTab='acct'; location.hash='svc'; };
+    if(!r._b){ r._b=1; r.addEventListener('click',open);
+      r.addEventListener('keydown',(e)=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); open(); } }); }
+  });
+  const st = document.getElementById('splitTog');
+  if (st && !st._b){ st._b = 1; st.addEventListener('click',(e)=>{
+    const v = e.target.dataset.split; if (v==null) return;
+    setChartMode(v==='1' ? 'split' : 'real');
+  }); }
+  view.querySelectorAll('[data-jump]').forEach(a=>{ if(!a._b){a._b=1;a.addEventListener('click',()=>{curSvc=a.dataset.jump;curTab='acct'})} });
+});
+window.addEventListener('chartmode',()=>window.__go());
+</script>
+</body>
+</html>

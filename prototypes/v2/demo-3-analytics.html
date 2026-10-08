@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>数据台 · API-free</title>
+<link rel="stylesheet" href="assets/fonts.css">
+<style>
+/* ===========================================================================
+   D3 数据台 Analytics — 浅色 · 图表主导
+   服务的身份色贯穿所有图形（KPI 迷你图 / 堆叠面积 / 排行条 / 占比环），
+   颜色本身就是数据模型。卡片轻投影，圆角 14，字号阶梯偏大。
+   =========================================================================== */
+:root{
+  --bg:#FBFBFC; --card:#FFFFFF; --line:#ECEEF2; --line2:#F4F5F8;
+  --text:#101828; --text2:#475467; --muted:#667085; --muted2:#98A2B3;
+  --accent:#4C6EF5; --ok:#12B886; --warn:#F79009; --err:#F04438;
+  --sans:var(--font-sans); --mono:var(--font-mono);
+  --sb:224px;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--text);font:400 13px/1.55 var(--sans);
+  -webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;padding:0;text-align:left}
+h1,h2,h3{margin:0;font-weight:600}
+
+.sb{position:fixed;inset:0 auto 0 0;width:var(--sb);background:var(--card);border-right:1px solid var(--line);
+  padding:16px 12px;overflow:auto;z-index:10}
+.sb .brand{display:flex;align-items:center;gap:9px;padding:0 8px 16px}
+.sb .brand svg{width:22px;height:22px;color:var(--text)}
+.sb .brand b{font-size:13.5px;font-weight:600;letter-spacing:-.015em}
+.sb .sec{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted2);margin:14px 8px 6px}
+.ni{display:flex;align-items:center;gap:9px;height:32px;padding:0 9px;border-radius:8px;color:var(--text2);
+  width:100%;font-size:12.5px}
+.ni:hover{background:var(--line2)}
+.ni.on{background:#EEF1FE;color:var(--accent);font-weight:500}
+.svi{display:flex;align-items:center;gap:9px;height:36px;padding:0 9px;border-radius:8px;color:var(--text2);width:100%}
+.svi:hover{background:var(--line2)}
+.svi.on{background:var(--line2);color:var(--text);font-weight:500}
+.svi img{width:18px;height:18px;border-radius:5px;flex:none}
+.svi .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.svi .d{margin-left:auto;width:7px;height:7px;border-radius:50%;background:var(--ok);flex:none}
+.svi.off .d{background:var(--muted2)} .svi.off img{filter:grayscale(1);opacity:.55}
+
+.top{position:sticky;top:0;display:flex;align-items:center;gap:14px;padding:18px 28px 14px;
+  background:rgba(251,251,252,.88);backdrop-filter:blur(10px);z-index:9;margin-left:var(--sb)}
+.top h1{font-size:19px;letter-spacing:-.02em}
+.top .sub{font-size:12px;color:var(--muted)}
+.top .right{margin-left:auto;display:flex;align-items:center;gap:10px}
+.seg{display:inline-flex;background:#F1F3F7;border-radius:9px;padding:2px}
+.seg button{padding:5px 11px;border-radius:7px;font-size:12px;color:var(--muted)}
+.seg button.on{background:var(--card);color:var(--text);font-weight:500;box-shadow:0 1px 2px rgba(16,24,40,.07)}
+.cmtog{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;font-size:11.5px;background:var(--card)}
+.cmtog span{padding:4px 10px;color:var(--muted)}
+.cmtog span.on{background:var(--text);color:#fff}
+
+.wrap{margin-left:var(--sb);padding:0 28px 56px;max-width:1600px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;
+  box-shadow:0 1px 2px rgba(16,24,40,.04);overflow:hidden}
+.card > header{display:flex;align-items:center;gap:9px;padding:15px 18px 0}
+.card > header h2{font-size:13.5px;letter-spacing:-.01em}
+.card > header .sub{font-size:11.5px;color:var(--muted)}
+.card > header .sp{margin-left:auto}
+.card .body{padding:16px 18px 18px}
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin:6px 0 16px}
+.kpi{padding:15px 17px 13px}
+.kpi .l{font-size:11.5px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.kpi .v{font-size:26px;font-weight:600;letter-spacing:-.025em;margin-top:8px;line-height:1.1}
+.kpi .d{font-size:11.5px;color:var(--muted);margin-top:5px}
+.kpi .d b{font-weight:500;color:var(--ok)}
+.kpi .spark{margin-top:11px;height:34px}
+.grid{display:grid;gap:16px}
+.g-2{grid-template-columns:minmax(0,1.5fr) minmax(0,1fr)}
+.g-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.legend{display:flex;gap:16px;flex-wrap:wrap}
+.legend span{display:inline-flex;align-items:center;gap:7px;font-size:11.5px;color:var(--muted)}
+.legend i{width:9px;height:9px;border-radius:3px}
+.axis{font-size:10px;fill:var(--muted2)}
+.rank{display:flex;align-items:center;gap:11px;padding:7px 0}
+.rank .n{width:14px;color:var(--muted2);font-size:11px;font-family:var(--mono)}
+.rank .nm{width:96px;font-size:12px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rank .bar{flex:1;height:8px;border-radius:4px;background:#F1F3F7;overflow:hidden}
+.rank .bar > i{display:block;height:100%;border-radius:4px}
+.rank .v{width:60px;text-align:right;font-size:11.5px;color:var(--text2);font-family:var(--mono)}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th{text-align:left;font-size:11px;color:var(--muted);font-weight:500;padding:0 12px 9px 0;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:10px 12px 10px 0;border-bottom:1px solid var(--line2);color:var(--text2);white-space:nowrap}
+tbody tr:last-child td{border-bottom:0}
+tbody tr:hover td{background:#FAFBFC}
+td.n,th.n{text-align:right;padding-right:16px;font-family:var(--mono);font-size:12px}
+.rowspark{display:inline-block;width:100%;vertical-align:middle;line-height:0}
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:var(--text2)}
+.chip i{width:6px;height:6px;border-radius:50%;background:currentColor}
+.chip.ok{color:var(--ok)} .chip.off{color:var(--muted2)} .chip.warn{color:var(--warn)} .chip.err{color:var(--err)}
+.chartbox svg{display:block}
+.note{font-size:11.5px;color:var(--muted);margin-top:10px;line-height:1.6}
+.sampletag{font-size:11px;color:#B54708;background:#FFFAEB;border:1px solid #FEDF89;border-radius:6px;padding:1.5px 7px}
+.big{display:flex;align-items:center;gap:11px}
+.big img{width:38px;height:38px;border-radius:10px}
+.empty{padding:26px 0;color:var(--muted);font-size:12.5px}
+</style>
+</head>
+<body>
+<aside class="sb" id="sb"></aside>
+<div class="top">
+  <div><h1 id="ttl">总览</h1><div class="sub" id="sub"></div></div>
+  <div class="right">
+    <span id="tog"></span>
+    <span class="seg" id="seg"><button class="on">30 天</button><button>7 天</button><button>今日</button></span>
+    <span style="display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--muted)">
+      <i style="width:7px;height:7px;border-radius:50%;background:var(--ok);display:block"></i>4/4 在线</span>
+  </div>
+</div>
+<div class="wrap" id="view"></div>
+
+<script src="assets/data.js"></script>
+<script src="assets/sample.js"></script>
+<script src="assets/logos.js"></script>
+<script src="assets/logo-inner.js"></script>
+<script src="assets/app.js"></script>
+<script>
+const D = window.DATA, SVC = D.services, tok = fmt.tok, int = fmt.int;
+const $ = (s)=>document.querySelector(s);
+$('#tog').innerHTML = toggleChartHTML();
+document.getElementById('seg').addEventListener('click',(e)=>{
+  if(e.target.tagName!=='BUTTON') return;
+  document.querySelectorAll('#seg button').forEach(b=>b.classList.toggle('on', b===e.target));
+});
+
+const NAV=[['ov','总览','grid'],['svc','服务','server'],['stats','统计','bars'],['logs','日志','lines'],['set','设置','sliders']];
+const TITLE={ov:'总览',svc:'服务',stats:'统计',logs:'日志',set:'设置'};
+const SUB={ov:'四个服务的状态、用量与事件',svc:'账号、模型与用量',stats:'跨服务用量聚合',logs:'面板事件与服务日志',set:'面板偏好与服务注册表'};
+let curSvc='workbuddy', curTab='acct';
+
+function paintSb(){
+  $('#sb').innerHTML = `<div class="brand"><svg viewBox="0 0 32 32" fill="currentColor" stroke="currentColor" stroke-linejoin="miter">${window.LOGO_INNER}</svg><b>API-free</b></div>
+    ${NAV.slice(0,1).map(()=>'').join('')}
+    <button class="ni" data-nav="ov">${ic('grid',15)} 总览</button>
+    <div class="sec">服务</div>
+    ${SVC.map(s=>`<button class="svi ${s.status==='running'?'':'off'} ${s.id===curSvc?'on':''}" data-svc="${s.id}">
+      <img src="${window.LOGOS[s.id]}" alt=""><span class="nm">${s.short}</span><span class="d"></span></button>`).join('')}
+    <div class="sec">分析</div>
+    <button class="ni" data-nav="stats">${ic('bars',15)} 统计</button>
+    <button class="ni" data-nav="logs">${ic('lines',15)} 日志</button>
+    <button class="ni" data-nav="set">${ic('sliders',15)} 设置</button>`;
+  $('#sb').querySelectorAll('[data-nav]').forEach(b=>b.addEventListener('click',()=>location.hash=b.dataset.nav));
+  $('#sb').querySelectorAll('[data-svc]').forEach(b=>b.addEventListener('click',()=>{curSvc=b.dataset.svc;curTab='acct';location.hash='svc'}));
+}
+
+/* ---------------- 图表 ---------------- */
+autoChart('[data-chart="hero"]', (W,H)=>{
+  const series = chartSeries(), pad={l:52,r:16,t:18,b:24};
+  const dense = chartMode()==='sample';
+  const keys=['cline','workbuddy','qoder','cmdgo'];
+  const X=i=>pad.l+(i/(series.length-1))*(W-pad.l-pad.r);
+  const max=Math.max(1,...series.map(d=>keys.reduce((s,k)=>s+(d.by[k]||0),0)));
+  const Y=v=>H-pad.b-(v/max)*(H-pad.t-pad.b);
+  return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">
+    ${[0,.25,.5,.75,1].map(f=>`<line x1="${pad.l}" x2="${W-pad.r}" y1="${Y(max*f)}" y2="${Y(max*f)}" stroke="#F1F3F7"/>
+      <text class="axis" x="${pad.l-10}" y="${Y(max*f)+3.5}" text-anchor="end">${tok(max*f)}</text>`).join('')}
+    ${ch.stack(keys.map(k=>({key:k,vals:series.map(d=>d.by[k]||0)})), series.length, W, H, pad)
+      .map(s=>`<path d="${s.d}" fill="${SVC_COLOR[s.key]}" opacity="${dense?0.72:0.62}"/>`).join('')}
+    ${series.map((d,i)=>d.reqs?`<line x1="${X(i)}" x2="${X(i)}" y1="${pad.t}" y2="${H-pad.b}" stroke="#D0D5DD" stroke-dasharray="2 3"/>`:'').join('')}
+    ${['2026-08-15','2026-09-01','2026-09-15','2026-10-01'].map(()=>'').join('')}
+    <text class="axis" x="${pad.l}" y="${H-6}">${series[0].full}</text>
+    <text class="axis" x="${(pad.l+W-pad.r)/2}" y="${H-6}" text-anchor="middle">${series[Math.floor(series.length/2)].full}</text>
+    <text class="axis" x="${W-pad.r}" y="${H-6}" text-anchor="end">${series[series.length-1].full}</text>
+  </svg>`;
+});
+autoChart('[data-chart="rowspark"]', (W,H,el)=>{
+  const series = chartSeries(), id = el.dataset.svc || 'all';
+  const vals = series.map(d=> id==='all' ? d.tok : (d.by[id]||0));
+  const max=Math.max(1,...vals);
+  const bw = W/Math.max(1,vals.length);
+  const c = id==='all' ? '#4C6EF5' : SVC_COLOR[id];
+  return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">
+    ${vals.map((v,i)=>{ const h=Math.max(v>0?1.5:0,(v/max)*(H-4));
+      return `<rect x="${(i*bw+1).toFixed(1)}" y="${(H-h).toFixed(1)}" width="${Math.max(1,bw-2).toFixed(1)}" height="${h.toFixed(1)}" rx="1" fill="${c}" opacity="${v?0.85:0.12}"/>`; }).join('')}
+  </svg>`;
+});
+autoChart('[data-chart="spark"]', (W,H,el)=>{
+  const series = chartSeries(), pad={l:0,r:0,t:3,b:3};
+  const id = el.dataset.svc || 'all';
+  const vals = series.map(d=> id==='all' ? d.tok : (d.by[id]||0));
+  const max=Math.max(1,...vals);
+  const X=i=>pad.l+(i/(series.length-1))*W, Y=v=>H-pad.b-(v/max)*(H-pad.t-pad.b);
+  const pts=vals.map((v,i)=>[X(i),Y(v)]);
+  const c = id==='all' ? '#4C6EF5' : SVC_COLOR[id];
+  return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">
+    <path d="${ch.area(pts,H-pad.b)}" fill="${c}" opacity=".10"/>
+    <path d="${ch.line(pts)}" fill="none" stroke="${c}" stroke-width="1.6"/></svg>`;
+});
+autoChart('[data-chart="donut"]', (W,H)=>{
+  const rows = ['cline','workbuddy','qoder','cmdgo'].map(k=>{
+    const t=D.totals30[k]||{}; return {k, v:(t.input||0)+(t.output||0)};});
+  const total = rows.reduce((s,r)=>s+r.v,0) || 1;
+  const R=64, C=2*Math.PI*R, cx=W/2, cy=H/2;
+  let off=0;
+  return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">
+    <circle cx="${cx}" cy="${cy}" r="${R}" fill="none" stroke="#F1F3F7" stroke-width="20"/>
+    ${rows.filter(r=>r.v>0).map(r=>{
+      const frac=r.v/total, seg=C*frac, el=`<circle cx="${cx}" cy="${cy}" r="${R}" fill="none" stroke="${SVC_COLOR[r.k]}"
+        stroke-width="20" stroke-dasharray="${seg} ${C-seg}" stroke-dashoffset="${-off}"
+        transform="rotate(-90 ${cx} ${cy})" stroke-linecap="butt"/>`;
+      off+=seg; return el; }).join('')}
+    <text x="${cx}" y="${cy-2}" text-anchor="middle" style="font-size:21px;font-weight:600;fill:#101828">${tok(total)}</text>
+    <text x="${cx}" y="${cy+17}" text-anchor="middle" class="axis">30 天 Tokens</text>
+  </svg>`;
+});
+
+/* ---------------- 视图 ---------------- */
+function kpi(label, val, delta){
+  return `<div class="card kpi"><div class="l">${label}</div><div class="v">${val}</div><div class="d">${delta}</div></div>`;
+}
+function viewOverview(){
+  const s=D.summary;
+  const tot30 = ['cline','workbuddy','qoder','cmdgo'].reduce((a,k)=>{const t=D.totals30[k]||{};return a+(t.input||0)+(t.output||0)},0);
+  return `
+  <div class="kpis">
+    ${kpi('今日 Tokens', tok(s.todayTok), `<b>+${s.prevTok?Math.round((s.todayTok-s.prevTok)/s.prevTok*100):0}%</b> 较昨日 · 输入 ${tok(s.todayIn)} / 输出 ${tok(s.todayOut)}`)}
+    ${kpi('今日请求', int(s.todayReqs), `平均 ${Math.round(s.todayTok/Math.max(1,s.todayReqs))} tok / 次`)}
+    ${kpi('活跃服务', s.active+' / '+s.total, `全部运行中 · ${s.cooling} 个冷却`)}
+    ${kpi('30 天 Tokens', tok(tot30), `共 ${int(['cline','workbuddy','qoder','cmdgo'].reduce((a,k)=>a+((D.totals30[k]||{}).reqs||0),0))} 次请求`)}
+  </div>
+  <section class="card" style="margin-bottom:16px"><header><h2>用量趋势</h2><span class="sub">按服务堆叠 · 每日 Tokens</span>
+    <span class="sp">${sampleTag()}</span></header>
+    <div class="body"><div class="chartbox" data-chart="hero" data-h="252"></div>
+      <div class="legend" style="margin-top:12px">${['cline','workbuddy','qoder','cmdgo'].map(k=>`<span><i style="background:${SVC_COLOR[k]}"></i>${SVC.find(s=>s.id===k).name}</span>`).join('')}</div>
+      <div class="note">统计自 10-06 起收录，此前无记录。真实快照只有两天有流量 —— 切右上角「示例密度」看图表在数据密集时的形态（示例态会标注）。</div></div></section>
+  <div class="grid g-2">
+    <section class="card"><header><h2>服务</h2><span class="sub">4 个 · 全部运行中</span></header>
+      <div class="body"><table><thead><tr><th>服务</th><th class="n">账号</th><th class="n">模型</th><th class="n">今日 Tokens</th><th style="width:104px">30 天</th><th>状态</th></tr></thead>
+        <tbody>${SVC.map(sv=>{const t=D.todayBySvc[sv.id];return `<tr>
+          <td><span style="display:inline-flex;align-items:center;gap:9px">${svcLogo(sv.id,17)}<b style="font-weight:500;color:var(--text)">${sv.name}</b>
+            <span style="color:var(--muted2);font-family:var(--mono);font-size:11px">:${sv.port}</span></span></td>
+          <td class="n">${sv.accounts==null?'—':sv.accounts}</td><td class="n">${sv.models==null?'—':sv.models}</td>
+          <td class="n">${t.tok?tok(t.tok):'—'}</td>
+          <td><span class="rowspark" data-chart="rowspark" data-svc="${sv.id}" data-h="26"></span></td>
+          <td style="padding-left:14px">${statusChip(sv.status)}</td></tr>`}).join('')}</tbody></table>
+        <div class="note">每行右侧是该服务 30 天的真实逐日用量（迷你趋势），与上方主图同一口径。</div></div></section>
+    <section class="card"><header><h2>30 天占比</h2></header><div class="body">
+      <div class="chartbox" data-chart="donut" data-h="170"></div>
+      <div class="legend" style="margin-top:6px;justify-content:center">${['cline','workbuddy'].map(k=>`<span><i style="background:${SVC_COLOR[k]}"></i>${SVC.find(s=>s.id===k).name}</span>`).join('')}</div>
+      <div class="note" style="text-align:center">qoder 与 cmdgo 为 0，是账号/授权未就绪。</div></div></section>
+  </div>
+  <section class="card" style="margin-top:16px"><header><h2>面板事件</h2><span class="sub">最近 ${D.events.length} 条</span></header>
+    <div class="body"><table><tbody>${D.events.map(e=>`<tr><td style="width:84px;font-family:var(--mono);color:var(--muted);font-size:11.5px">${e.t}</td><td>${e.msg}</td></tr>`).join('')}</tbody></table></div></section>`;
+}
+const TABS={workbuddy:[['acct','账号'],['tasks','任务中心'],['models','模型'],['usage','用量'],['logs','日志'],['access','接入'],['conf','设置']],
+  qoder:[['acct','账号'],['models','模型'],['usage','用量'],['logs','日志'],['access','接入'],['conf','设置']],
+  cline:[['acct','账号'],['models','模型库'],['usage','用量'],['logs','日志'],['access','接入'],['conf','设置']],
+  cmdgo:[['acct','账号'],['models','模型'],['usage','用量'],['logs','日志'],['access','接入'],['conf','设置']]};
+function viewService(){
+  const sv=SVC.find(s=>s.id===curSvc);
+  const t=D.todayBySvc[sv.id], tt=D.totals30[sv.id]||{input:0,output:0,reqs:0};
+  return `
+  <section class="card" style="margin-bottom:16px"><div class="body">
+    <div class="big">${svcLogo(sv.id,38)}
+      <div><div style="font-size:15px;font-weight:600">${sv.name} ${statusChip(sv.status)}</div>
+        <div style="font-size:11.5px;color:var(--muted);font-family:var(--mono)">:${sv.port} · pid ${sv.pid} · restarts ${sv.restarts} · ${sv.managed?'面板托管':'外部实例'}</div></div>
+      <div style="margin-left:auto;display:flex;gap:8px">
+        <button class="seg" style="padding:5px 11px;font-size:12px;border:1px solid var(--line);background:var(--card);border-radius:9px">打开原面板</button>
+        <button class="seg" style="padding:5px 11px;font-size:12px;border:1px solid var(--line);background:var(--card);border-radius:9px">重启</button></div>
+    </div></div></section>
+  <div class="seg" style="margin-bottom:16px">${TABS[curSvc].map(([k,l])=>`<button class="${curTab===k?'on':''}" data-tab="${k}">${l}</button>`).join('')}</div>
+  <div class="kpis" style="grid-template-columns:repeat(4,1fr)">
+    <div class="card kpi"><div class="l">今日 Tokens</div><div class="v">${t.tok?tok(t.tok):'—'}</div><div class="d">${t.reqs} 次请求</div></div>
+    <div class="card kpi"><div class="l">30 天输入</div><div class="v">${tok(tt.input)}</div></div>
+    <div class="card kpi"><div class="l">30 天输出</div><div class="v">${tok(tt.output)}</div></div>
+    <div class="card kpi"><div class="l">30 天请求</div><div class="v">${int(tt.reqs)}</div></div>
+  </div>
+  <section class="card"><header><h2>用量趋势</h2><span class="sp">${sampleTag()}</span></header>
+    <div class="body"><div class="chartbox" data-chart="spark" data-svc="${curSvc}" data-h="120"></div>
+      <div class="note">该服务口径：以服务自身统计为准，面板按日搬运。</div></div></section>`;
+}
+function viewStats(){
+  const series=chartSeries();
+  const rows=['workbuddy','qoder','cline','cmdgo'].map(id=>{
+    const t=D.totals30[id]||{input:0,output:0,reqs:0};
+    return {id,name:SVC.find(s=>s.id===id).name,tok:(t.input||0)+(t.output||0),reqs:t.reqs||0};}).sort((a,b)=>b.tok-a.tok);
+  const maxTok=Math.max(1,...rows.map(r=>r.tok));
+  const byModel={'deepseek/deepseek-v4-flash':1069,'cline-free/deepseek-v4.1-flash':432,'cn:deepseek-v4.1-flash':173,'z-ai/glm-5.3-flash':0,'poolside/laguna-s-2.1:free':0};
+  const mx=Math.max(1,...Object.values(byModel));
+  return `
+  <div class="kpis">
+    ${kpi('30 天 Tokens', tok(rows.reduce((s,r)=>s+r.tok,0)), 'cline 为主要来源', 'all')}
+    ${kpi('30 天请求', int(rows.reduce((s,r)=>s+r.reqs,0)), '平均 176 tok / 次', 'all')}
+    ${kpi('收录天数', series.length+' 天', `自 ${series[0].full} 起`, 'all')}
+    ${kpi('有流量天数', series.filter(d=>d.reqs>0).length+' 天', '其余日期无记录', 'all')}
+  </div>
+  <div class="grid g-2">
+    <section class="card"><header><h2>四服务堆叠趋势</h2><span class="sp">${sampleTag()}</span></header>
+      <div class="body"><div class="chartbox" data-chart="hero" data-h="230"></div>
+        <div class="legend" style="margin-top:12px">${['cline','workbuddy','qoder','cmdgo'].map(k=>`<span><i style="background:${SVC_COLOR[k]}"></i>${SVC.find(s=>s.id===k).name}</span>`).join('')}</div></div></section>
+    <section class="card"><header><h2>按服务排行</h2><span class="sub">30 天 Tokens</span></header><div class="body">
+      ${rows.map((r,i)=>`<div class="rank"><span class="n">${i+1}</span>
+        <span class="nm" style="display:flex;align-items:center;gap:7px">${svcLogo(r.id,15)}${r.name}</span>
+        <span class="bar"><i style="width:${(r.tok/maxTok*100).toFixed(1)}%;background:${SVC_COLOR[r.id]}"></i></span>
+        <span class="v">${tok(r.tok)}</span></div>`).join('')}
+      <div class="note">排行按 30 天 Tokens；qoder / cmdgo 为 0 是账号或授权未就绪，不是统计故障。</div></div></section>
+  </div>
+  <div class="grid g-2" style="margin-top:16px">
+    <section class="card"><header><h2>按模型排行</h2><span class="sub">30 天 Tokens</span></header><div class="body">
+      ${Object.entries(byModel).map(([k,v],i)=>`<div class="rank"><span class="n">${i+1}</span>
+        <span class="nm" style="width:230px;font-family:var(--mono);font-size:11.5px">${k}</span>
+        <span class="bar"><i style="width:${(v/mx*100).toFixed(1)}%;background:#4C6EF5"></i></span>
+        <span class="v">${tok(v)}</span></div>`).join('')}
+      <div class="note">模型维度来自各服务自身统计：cline 的按模型数据在其 /v1/status 里，面板按日差分。</div></div></section>
+    <section class="card"><header><h2>逐日明细</h2></header><div class="body">
+      <table><thead><tr><th>日期</th><th class="n">输入</th><th class="n">输出</th><th class="n">合计</th><th class="n">请求</th></tr></thead>
+        <tbody>${series.filter(d=>d.reqs>0).map(d=>`<tr><td style="font-family:var(--mono)">${d.full}</td>
+          <td class="n">${int(d.in)}</td><td class="n">${int(d.out)}</td><td class="n"><b style="color:var(--text)">${int(d.tok)}</b></td>
+          <td class="n">${d.reqs}</td></tr>`).join('')}</tbody></table></div></section>
+  </div>`;
+}
+function viewLogs(){
+  return `<section class="card" style="margin-bottom:16px"><header><h2>面板事件</h2><span class="sub">启停 / 崩溃拉起 / 统计拉取</span></header>
+    <div class="body"><table><tbody>${D.events.map(e=>`<tr><td style="width:90px;font-family:var(--mono);color:var(--muted);font-size:11.5px">${e.t}</td><td>${e.msg}</td></tr>`).join('')}</tbody></table>
+    <div class="note">四个服务都没有逐条请求的结构化接口，因此不做跨服务的请求流水。</div></div></section>
+  <section class="card"><header><h2>服务运行日志</h2></header><div class="body">
+    <table><thead><tr><th>服务</th><th>接口</th><th class="n">条数</th><th>说明</th></tr></thead>
+      <tbody>${SVC.map(s=>`<tr><td><span style="display:inline-flex;align-items:center;gap:8px">${svcLogo(s.id,15)}${s.name}</span></td>
+        <td style="font-family:var(--mono);font-size:11.5px">${s.id==='workbuddy'||s.id==='qoder'?'/panel/api/logs':'—'}</td>
+        <td class="n">${s.id==='workbuddy'?4:s.id==='qoder'?2:'—'}</td>
+        <td style="color:var(--muted)">${s.id==='cline'?'日志只在内存里，无历史接口':s.id==='cmdgo'?'访问日志在服务终端输出':'{entries:[{ts,ch,text}]}'}</td></tr>`).join('')}</tbody></table></div></section>`;
+}
+function viewSet(){
+  return `<div class="grid g-2">
+    <section class="card"><header><h2>面板偏好</h2></header><div class="body">
+      <table><tbody>
+        <tr><td style="color:var(--muted);width:180px">监听地址</td><td style="font-family:var(--mono)">127.0.0.1:9000</td></tr>
+        <tr><td style="color:var(--muted)">状态轮询</td><td style="font-family:var(--mono)">3s</td></tr>
+        <tr><td style="color:var(--muted)">统计轮询</td><td style="font-family:var(--mono)">60s</td></tr>
+        <tr><td style="color:var(--muted)">开关语义</td><td>真·进程启停（杀进程树）</td></tr></tbody></table></div></section>
+    <section class="card"><header><h2>接入入口</h2></header><div class="body">
+      <table><tbody>${SVC.map(s=>`<tr><td style="width:150px"><span style="display:inline-flex;align-items:center;gap:8px">${svcLogo(s.id,15)}${s.name}</span></td>
+        <td style="font-family:var(--mono);font-size:11.5px;color:var(--text2)">/api/svc/${s.id}/v1</td></tr>`).join('')}</tbody></table>
+      <div class="note">经面板调用时客户端 api_key 随便填，面板会覆盖成真实密钥。没有「一个 base URL 调四家」的聚合入口。</div></div></section></div>
+  <section class="card" style="margin-top:16px"><header><h2>服务注册表</h2></header><div class="body">
+    <table><thead><tr><th>服务</th><th class="n">端口</th><th>启动</th><th>鉴权来源</th></tr></thead>
+      <tbody>${SVC.map(s=>`<tr><td><span style="display:inline-flex;align-items:center;gap:8px">${svcLogo(s.id,15)}${s.name}</span></td>
+        <td class="n">${s.port}</td>
+        <td style="font-family:var(--mono);font-size:11.5px">${s.id==='workbuddy'?'go run ./cmd/server':s.id==='qoder'?'bin\\qoder-free.exe':s.id==='cline'?'node start.mjs':'node dist/index.js'}</td>
+        <td style="font-family:var(--mono);font-size:11.5px;color:var(--muted)">${s.id==='workbuddy'||s.id==='qoder'?'config.json → api_key':s.id==='cline'?'.env.local → API_KEY':'~/.cmdgo-bridge/config.json'}</td></tr>`).join('')}</tbody></table>
+    <div class="note">快照 ${D.snapshotAt} · ${D.panel.note}</div></div></section>`;
+}
+
+const VIEWS={ov:viewOverview, svc:viewService, stats:viewStats, logs:viewLogs, set:viewSet};
+mountRouter(VIEWS,(act)=>{
+  paintSb();
+  document.getElementById('ttl').textContent = act==='svc'? SVC.find(s=>s.id===curSvc).name : TITLE[act];
+  document.getElementById('sub').textContent = act==='svc' ? `:${SVC.find(s=>s.id===curSvc).port} · 账号 / 模型 / 用量 / 日志 / 接入 / 设置` : SUB[act];
+  $('#view').querySelectorAll('[data-tab]').forEach(b=>b.addEventListener('click',()=>{curTab=b.dataset.tab;window.__go()}));
+});
+window.addEventListener('chartmode',()=>window.__go());
+</script>
+</body>
+</html>

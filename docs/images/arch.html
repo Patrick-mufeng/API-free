@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    width: 1600px; height: 442px; padding: 40px 52px;
+    background: #fff; color: #17181a;
+    font: 14px/1.5 "Inter", "Microsoft YaHei UI", "PingFang SC", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .hd { display: flex; align-items: baseline; gap: 12px; margin-bottom: 6px; }
+  h1 { font-size: 19px; font-weight: 700; letter-spacing: -0.01em; }
+  .sub { font-size: 12.5px; color: #8a8a86; }
+  .row { display: grid; grid-template-columns: 1fr; gap: 0; }
+
+  /* 面板层 */
+  .panel {
+    margin-top: 26px; border: 1px solid #17181a; border-radius: 8px;
+    padding: 16px 20px; display: flex; align-items: center; gap: 22px;
+  }
+  .panel .ttl { font-size: 15px; font-weight: 700; }
+  .panel .meta { font-size: 12px; color: #8a8a86; }
+  .tabs { display: flex; gap: 8px; margin-left: auto; }
+  .tabs span {
+    font-size: 11.5px; padding: 3px 10px; border: 1px solid #e7e5e1;
+    border-radius: 6px; color: #5b5b57;
+  }
+  .tabs span.on { background: #17181a; color: #fff; border-color: #17181a; }
+
+  /* 连线 */
+  .wires { height: 54px; position: relative; }
+  .wires svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .wlabel {
+    position: absolute; left: 50%; top: 22px; transform: translateX(-50%);
+    font-size: 11.5px; color: #8a8a86; background: #fff; padding: 0 12px;
+  }
+
+  /* 服务层 */
+  .svcs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  .svc {
+    border: 1px solid #e7e5e1; border-radius: 8px; padding: 14px 16px;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .svc .top { display: flex; align-items: center; gap: 9px; }
+  .svc .dot { width: 7px; height: 7px; border-radius: 50%; background: #159456; }
+  .svc .nm { font-size: 13.5px; font-weight: 650; }
+  .svc .port { font-size: 11.5px; color: #8a8a86; font-family: "JetBrains Mono", ui-monospace, monospace; }
+  .svc .stack { font-size: 11.5px; color: #8a8a86; }
+  .svc .bar { height: 3px; background: #f1efec; border-radius: 2px; overflow: hidden; }
+  .svc .bar i { display: block; height: 100%; border-radius: 2px; }
+
+  .foot {
+    margin-top: 22px; padding-top: 14px; border-top: 1px solid #e7e5e1;
+    display: flex; gap: 34px; font-size: 12px; color: #5b5b57;
+  }
+  .foot b { color: #17181a; font-weight: 600; }
+  .foot .mono { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 11.5px; }
+</style>
+</head>
+<body>
+  <div class="hd">
+    <h1>API-free</h1>
+    <span class="sub">四个免费 AI 反代服务，一个面板统一管理</span>
+  </div>
+
+  <div class="panel">
+    <div>
+      <div class="ttl">统一面板</div>
+      <div class="meta">进程监督 · API 代理 · 用量聚合 &nbsp;·&nbsp; 127.0.0.1:9000</div>
+    </div>
+    <div class="tabs">
+      <span class="on">总览</span><span>统计</span><span>日志</span><span>设置</span>
+      <span>服务详情（账号 / 模型 / 用量 / 接入）</span>
+    </div>
+  </div>
+
+  <div class="wires">
+    <svg viewBox="0 0 1496 54" preserveAspectRatio="none">
+      <!-- 主干从面板底部下来，再分到四个服务；横线避开中间的文字标签 -->
+      <path d="M748 0 V9" fill="none" stroke="#d9d5cf" stroke-width="1"/>
+      <path d="M186 30 V9 H1310 V30" fill="none" stroke="#d9d5cf" stroke-width="1"/>
+      <path d="M186 30 V48 M560 30 V48 M936 30 V48 M1310 30 V48" fill="none" stroke="#d9d5cf" stroke-width="1"/>
+      <path d="M748 9 V30" fill="none" stroke="#d9d5cf" stroke-width="1"/>
+      <circle cx="748" cy="9" r="3" fill="#2e64f0"/>
+    </svg>
+    <div class="wlabel" style="top:18px">启停 · 健康探测 · 反向代理注入鉴权 · 用量采集</div>
+  </div>
+
+  <div class="svcs">
+    <div class="svc">
+      <div class="top"><span class="dot"></span><span class="nm">Qoder-free</span></div>
+      <div class="port">:8210</div>
+      <div class="stack">Go + Node worker</div>
+      <div class="bar"><i style="width:100%;background:#2e64f0"></i></div>
+    </div>
+    <div class="svc">
+      <div class="top"><span class="dot"></span><span class="nm">WorkBuddy-free</span></div>
+      <div class="port">:7863</div>
+      <div class="stack">Go</div>
+      <div class="bar"><i style="width:100%;background:#159456"></i></div>
+    </div>
+    <div class="svc">
+      <div class="top"><span class="dot"></span><span class="nm">Cline-free</span></div>
+      <div class="port">:8787</div>
+      <div class="stack">Node</div>
+      <div class="bar"><i style="width:100%;background:#c8811a"></i></div>
+    </div>
+    <div class="svc">
+      <div class="top"><span class="dot"></span><span class="nm">cmdgo-bridge</span></div>
+      <div class="port">:8014</div>
+      <div class="stack">Node</div>
+      <div class="bar"><i style="width:100%;background:#5b5b57"></i></div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <div><b>对接客户端</b> &nbsp;<span class="mono">127.0.0.1:9000/api/svc/&lt;服务&gt;/v1</span> &nbsp;OpenAI 兼容 · cline 另支持 Anthropic</div>
+    <div><b>不改上游</b> &nbsp;四个服务各自独立演进</div>
+  </div>
+</body>
+</html>

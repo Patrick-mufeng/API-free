@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>总览 · API-free</title>
+<link rel="stylesheet" href="glass.css">
+<style>
+  .ovmain{display:grid; grid-template-columns:1.8fr 1fr; gap:16px; margin-bottom:16px}
+  .svc-g{padding:16px 18px; margin-bottom:12px}
+  .svc-g:last-child{margin-bottom:0}
+  .svc-g .head{display:flex; align-items:center; gap:10px}
+  .svc-g .ava{width:34px;height:34px;border-radius:11px;display:grid;place-items:center;color:#fff;font-weight:800;font-size:14px;flex:none}
+  .svc-g .nm{font-weight:700; font-size:14px}
+  .svc-g .pt{font-size:11.5px; color:var(--faint); font-family:var(--mono)}
+  .svc-g .num{margin:12px 0 4px; display:flex; align-items:baseline; gap:6px}
+  .svc-g .num b{font-size:19px; font-variant-numeric:tabular-nums; letter-spacing:-.01em}
+  .svc-g .num span{font-size:12px; color:var(--faint)}
+  .svc-g.off .num{opacity:.45}
+  .svc-g .foot{display:flex; align-items:center; justify-content:space-between; margin-top:12px; padding-top:12px; border-top:1px solid var(--line-soft)}
+  .svc-g .confirm{display:none; margin-top:10px; padding:8px 11px; border-radius:11px;
+    background:rgba(223,75,79,.1); border:1px solid rgba(223,75,79,.3); font-size:12px; color:#a03a3e; align-items:center; gap:8px}
+  .svc-g .confirm.show{display:flex; animation:rise .25s var(--ease-out) both}
+  @media (max-width:1280px){.ovmain{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="bg" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+<div class="wrap">
+
+  <div class="alertbar"><span class="ico"></span><span><b>2 个模型冷却中</b>：glm-5.2 预计 16:42 恢复 · deepseek-v3.2 预计 16:58 恢复</span></div>
+
+  <div class="kpis">
+    <div class="kpi"><h3>今日 Tokens</h3><div class="v" id="kTok">813.9万</div><div class="d up">较昨日 +12.4%</div></div>
+    <div class="kpi"><h3>今日请求</h3><div class="v">1,189</div><div class="d up">较昨日 +38</div></div>
+    <div class="kpi"><h3>活跃服务</h3><div class="v" id="kAct">3 / 4</div><div class="d">cmdgo-bridge 已停止</div></div>
+    <div class="kpi"><h3>冷却中模型</h3><div class="v">2</div><div class="d">workbuddy · qoder</div></div>
+  </div>
+
+  <div class="ovmain">
+    <div class="sect" style="margin-bottom:0">
+      <div class="sect-head">
+        <h3>用量趋势</h3><span class="sub">近 30 天 · 每日 Tokens</span>
+        <span class="sp"></span>
+        <div class="legend" id="ovLegend" style="display:flex;gap:14px;font-size:12px;color:var(--muted)"></div>
+        <div class="seg" id="ovSeg"><button class="on" data-m="all">全部</button><button data-m="split">按服务分线</button></div>
+      </div>
+      <div class="chartbox"><svg id="ovChart" viewBox="0 0 1000 250" preserveAspectRatio="none"></svg><div class="chart-tip" id="ovTip"></div></div>
+    </div>
+
+    <div class="sect" style="margin-bottom:0">
+      <div class="sect-head"><h3>服务状态</h3><span class="sub">进程监督 · 真·启停</span></div>
+      <div id="svcGrid"></div>
+    </div>
+  </div>
+
+  <div class="sect">
+    <div class="sect-head"><h3>最近请求</h3><span class="sub">跨服务流水 · 最近 8 条</span><span class="sp"></span><span class="sub">16:03:41 更新</span></div>
+    <div class="tbox"><table>
+      <thead><tr><th style="width:90px">时间</th><th style="width:110px">服务</th><th>模型</th><th class="num-r" style="width:70px">状态</th><th class="num-r" style="width:90px">耗时</th><th class="num-r" style="width:100px">Tokens</th></tr></thead>
+      <tbody id="recentBody"></tbody>
+    </table></div>
+  </div>
+
+</div>
+<script src="app.js"></script>
+<script>
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+var SVC=[
+  {id:'workbuddy',name:'WorkBuddy-free',port:7863,color:'#2f9e5f',status:'running',today:'311.9万',reqs:512},
+  {id:'qoder',name:'Qoder-free',port:8210,color:'#3d6fd0',status:'running',today:'212.6万',reqs:386},
+  {id:'cline',name:'Cline-free',port:8787,color:'#c07427',status:'running',today:'289.4万',reqs:291},
+  {id:'cmdgo',name:'cmdgo-bridge',port:11435,color:'#cc4b44',status:'stopped',today:null,reqs:0}
+];
+var NAMES=['deepseek-v3.2','glm-5.2','claude-sonnet-4-5','gpt-5-codex','kimi-k2','gemini-3-flash'];
+var DAYS=30;
+function gen(seed,base,amp){var r=mulberry32(seed),out=[];for(var i=0;i<DAYS;i++){var wk=(i%7===5||i%7===6)?.55:1;out.push(Math.round((base+amp*r())*wk*(0.75+0.25*Math.sin(i/4))))}return out}
+var SERIES={qoder:gen(11,520000,260000),workbuddy:gen(22,640000,300000),cline:gen(33,580000,240000),cmdgo:gen(44,180000,120000)};
+function sumSeries(){var out=[];for(var i=0;i<DAYS;i++)out.push(SVC.reduce(function(a,s){return a+SERIES[s.id][i]},0));return out}
+var ovSeries=SVC.map(function(s){return{name:s.name,color:s.color,data:SERIES[s.id]}});
+
+function drawAll(){
+  $('#ovLegend').innerHTML='<span><i style="display:inline-block;width:8px;height:8px;border-radius:2px;background:'+SVC[0].color+';margin-right:5px"></i>全部服务</span>';
+  chart($('#ovChart'),$('#ovTip'),[{name:'全部',color:SVC[0].color,data:sumSeries()}],'area',null,{reqData:sumSeries().map(function(v){return Math.round(v/1600)})});
+}
+function drawSplit(){
+  $('#ovLegend').innerHTML=SVC.map(function(s){return '<span><i style="display:inline-block;width:8px;height:8px;border-radius:2px;background:'+s.color+';margin-right:5px"></i>'+s.name+'</span>'}).join('');
+  chart($('#ovChart'),$('#ovTip'),ovSeries,'split');
+}
+drawAll();
+$('#ovSeg').addEventListener('click',function(e){
+  var b=e.target.closest('button');if(!b)return;
+  this.querySelectorAll('button').forEach(function(x){x.classList.toggle('on',x===b)});
+  b.dataset.m==='all'?drawAll():drawSplit();
+});
+
+/* 服务卡（玻璃） */
+function renderSvcs(){
+  $('#svcGrid').innerHTML=SVC.map(function(s){
+    var on=s.status!=='stopped';
+    return '<div class="svc-g'+(on?'':' off')+'" data-id="'+s.id+'">'+
+      '<div class="head"><span class="ava" style="background:linear-gradient(135deg,'+s.color+','+s.color+'aa)">'+s.name[0].toUpperCase()+'</span>'+
+      '<div style="flex:1;min-width:0"><div class="nm">'+s.name+'</div><div class="pt">:'+s.port+'</div></div>'+
+      '<button class="sw sm" role="switch" aria-checked="'+on+'" aria-label="'+s.name+' 开关" data-sw="'+s.id+'"'+(s._pending?' disabled':'')+'></button></div>'+
+      '<div class="num">'+(on?'<b>'+s.today+'</b><span>tok 今日</span>':'<b style="color:var(--faint)">-</b><span>已停止</span>')+'</div>'+
+      '<div class="foot"><span class="st '+(s.status==='running'?'run':s.status==='booting'?'boot':'stop')+'"><i></i>'+
+        (s._pending?s._pendingT:s.status==='running'?'运行中':s.status==='booting'?'启动中':'已停止')+'</span>'+
+      '<a href="#" class="enterlink" data-nav="service:'+s.id+'">进入服务 →</a></div>'+
+      '<div class="confirm" data-cf><span>停止后进行中的请求会失败。</span><span style="flex:1"></span>'+
+      '<button class="btn ghost xs" data-no>取消</button><button class="btn dgr xs" data-yes>确认停止</button></div></div>';
+  }).join('');
+}
+renderSvcs();
+$('#svcGrid').addEventListener('click',function(e){
+  var card=e.target.closest('.svc-g');if(!card)return;
+  var id=card.dataset.id,svc=SVC.find(function(s){return s.id===id});
+  if(e.target.closest('[data-no]')){card.querySelector('[data-cf]').classList.remove('show');return}
+  if(e.target.closest('[data-yes]')){
+    card.querySelector('[data-cf]').classList.remove('show');
+    svc._pending=true;svc._pendingT='停止中…';renderSvcs();
+    setTimeout(function(){svc.status='stopped';svc._pending=false;svc.today=null;svc.reqs=0;kpi();renderSvcs()},900);
+    return;
+  }
+  if(e.target.closest('[data-sw]')){
+    if(e.target.getAttribute('aria-checked')==='true'){card.querySelector('[data-cf]').classList.add('show')}
+    else{
+      svc._pending=true;svc._pendingT='启动中…';svc.status='booting';renderSvcs();
+      setTimeout(function(){svc._pending=false;svc.status='running';svc.today=svc.id==='cmdgo'?'112.8万':svc.today;svc.reqs=svc.id==='cmdgo'?142:svc.reqs;kpi();renderSvcs()},1300);
+    }
+  }
+});
+function kpi(){
+  var act=SVC.filter(function(s){return s.status!=='stopped'});
+  $('#kTok').textContent=act.length===4?'847.3万':'813.9万';
+  $('#kAct').textContent=act.length+' / 4';
+}
+
+/* 最近请求 */
+var RECENT=[
+  ['16:03:41','workbuddy','claude-sonnet-4-5',200,'2.31s','48,204'],
+  ['16:03:12','cline','deepseek-v3.2',200,'1.02s','12,847'],
+  ['16:02:58','qoder','kimi-k2',200,'0.84s','6,032'],
+  ['16:02:31','workbuddy','glm-5.2',429,'0.12s','0'],
+  ['16:02:07','cline','claude-sonnet-4-5',200,'3.14s','31,580'],
+  ['16:01:44','workbuddy','gpt-5-codex',200,'2.62s','18,921'],
+  ['16:01:20','qoder','deepseek-v3.2',200,'1.38s','9,410'],
+  ['16:00:55','cline','glm-5.2',200,'0.96s','4,208']
+];
+$('#recentBody').innerHTML=RECENT.map(function(r){
+  return '<tr><td>'+r[0]+'</td><td><span class="chip">'+r[1]+'</span></td><td class="m">'+r[2]+'</td>'+
+  '<td class="num-r"><span class="code '+(r[3]===200?'s':'w')+'">'+r[3]+'</span></td><td class="num-r">'+r[4]+'</td><td class="num-r">'+r[5]+'</td></tr>';
+}).join('');
+</script>
+</body>
+</html>

@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>API-free · 统一面板</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="theme.css">
+<style>
+  html,body{height:100%}
+  .side{
+    position:fixed; z-index:60; left:0; top:0; bottom:0; width:208px;
+    display:flex; flex-direction:column; gap:1px; padding:18px 14px;
+    background:#fff; border-right:1px solid var(--line);
+  }
+  .brand{display:flex; align-items:center; gap:10px; padding:2px 8px 18px}
+  .brand svg{width:26px;height:26px;display:block}
+  .brand b{font-size:14.5px; letter-spacing:-.01em; display:block; line-height:1.2}
+  .brand small{font-size:10.5px; color:var(--faint); font-weight:500; letter-spacing:.04em}
+  .grp{font-size:10.5px; color:var(--faint); font-weight:600; letter-spacing:.1em; padding:12px 10px 5px}
+  .nitem{
+    display:flex; align-items:center; gap:9px; width:100%;
+    border:0; background:transparent; color:var(--muted); text-align:left;
+    font:inherit; font-size:13.5px; font-weight:500; padding:7px 10px; border-radius:8px; cursor:pointer;
+    transition:color .15s ease-out, background .15s ease-out;
+  }
+  .nitem svg{flex:none; opacity:.7}
+  .nitem:hover{color:var(--text); background:var(--accent-soft)}
+  .nitem.on{color:var(--text); font-weight:650}
+  .nitem.on svg{opacity:1}
+  .nitem .dot{width:6px;height:6px;border-radius:50%;margin-left:auto;flex:none}
+  .nitem .dot.run{background:var(--ok)} .nitem .dot.stop{background:#c9c6be}
+  .side .spacer{flex:1}
+  .mocktag{font-size:10.5px; color:var(--faint); text-align:center; border:1px dashed var(--line); border-radius:var(--r-ctl); padding:4px 0}
+  .stage{margin-left:208px; height:100dvh}
+  .stage iframe{display:block; width:100%; height:100%; border:0}
+  @media (max-width:900px){
+    .side{display:none}
+    .stage{margin-left:0}
+  }
+</style>
+</head>
+<body>
+<aside class="side">
+  <div class="brand">
+    <svg viewBox="0 0 32 32" aria-hidden="true">
+      <rect x="1.5" y="1.5" width="29" height="29" rx="9" fill="#ffffff" stroke="#1c1c1a" stroke-width="1.8"/>
+      <circle cx="8.7" cy="8.7" r="2.5" fill="none" stroke="#1c1c1a" stroke-width="1.6"/>
+      <circle cx="23.3" cy="8.7" r="2.5" fill="none" stroke="#1c1c1a" stroke-width="1.6"/>
+      <circle cx="8.7" cy="23.3" r="2.5" fill="none" stroke="#1c1c1a" stroke-width="1.6"/>
+      <circle cx="23.3" cy="23.3" r="2.5" fill="none" stroke="#1c1c1a" stroke-width="1.6"/>
+      <path d="M10.4 10.4 L14 14 M21.6 10.4 L18 14 M10.4 21.6 L14 18 M21.6 21.6 L18 18" stroke="#1c1c1a" stroke-width="1.6" stroke-linecap="round"/>
+      <circle cx="16" cy="16" r="2.9" fill="#1c1c1a"/>
+    </svg>
+    <div><b>API-free</b><small>统一面板 · 素瓷</small></div>
+  </div>
+  <nav id="nav">
+    <button class="nitem on" data-page="overview"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1.5" y="1.5" width="5.4" height="5.4" rx="1.2"/><rect x="9.1" y="1.5" width="5.4" height="5.4" rx="1.2"/><rect x="1.5" y="9.1" width="5.4" height="5.4" rx="1.2"/><rect x="9.1" y="9.1" width="5.4" height="5.4" rx="1.2"/></svg>总览</button>
+    <button class="nitem" data-page="stats"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M3 13.5v-5"/><path d="M8 13.5v-9"/><path d="M13 13.5v-6.5"/></svg>统计</button>
+    <button class="nitem" data-page="logs"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2.5 4h11"/><path d="M2.5 8h11"/><path d="M2.5 12h7"/></svg>日志</button>
+    <button class="nitem" data-page="settings"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2.5 5h11"/><circle cx="6" cy="5" r="1.8"/><path d="M2.5 11h11"/><circle cx="10.5" cy="11" r="1.8"/></svg>设置</button>
+  </nav>
+  <div class="grp">服务</div>
+  <nav id="svcNav">
+    <button class="nitem" data-page="workbuddy">WorkBuddy-free<span class="dot run"></span></button>
+    <button class="nitem" data-page="qoder">Qoder-free<span class="dot run"></span></button>
+    <button class="nitem" data-page="cline">Cline-free<span class="dot run"></span></button>
+    <button class="nitem" data-page="cmdgo">cmdgo-bridge<span class="dot stop"></span></button>
+  </nav>
+  <div class="spacer"></div>
+  <div class="mocktag">M0 原型 · 示例数据</div>
+</aside>
+
+<div class="stage"><iframe id="frame" src="overview.html" title="content"></iframe></div>
+
+<script>
+  var PAGES = {
+    overview:  ['总览', '四服务聚合'],
+    stats:     ['统计', '跨服务聚合统计'],
+    logs:      ['日志', '跨服务请求流水'],
+    settings:  ['设置', '面板自身'],
+    qoder:     ['Qoder-free', 'Go · 端口 8210'],
+    workbuddy: ['WorkBuddy-free', 'Go · 端口 7863'],
+    cline:     ['Cline-free', 'Node · 端口 8787'],
+    cmdgo:     ['cmdgo-bridge', 'Node · 端口 11435']
+  };
+  var frame = document.getElementById('frame');
+  var current = 'overview';
+
+  function setPage(p) {
+    if (!PAGES[p] || p === current) return;
+    current = p;
+    frame.src = p + '.html';
+    document.querySelectorAll('#nav .nitem, #svcNav .nitem').forEach(b => {
+      b.classList.toggle('on', b.dataset.page === p);
+    });
+    var url = new URL(location);
+    url.searchParams.set('page', p);
+    history.replaceState(null, '', url);
+  }
+
+  document.getElementById('nav').addEventListener('click', e => {
+    var b = e.target.closest('.nitem'); if (b) setPage(b.dataset.page);
+  });
+  document.getElementById('svcNav').addEventListener('click', e => {
+    var b = e.target.closest('.nitem'); if (b) setPage(b.dataset.page);
+  });
+  window.addEventListener('message', e => {
+    if (e.data && e.data.type === 'nav' && PAGES[e.data.target]) setPage(e.data.target);
+  });
+  var initPage = new URLSearchParams(location.search).get('page') || 'overview';
+  current = null;
+  setPage(initPage);
+</script>
+</body>
+</html>

@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>日志 · API-free</title>
+<link rel="stylesheet" href="glass.css">
+</head>
+<body>
+<div class="wrap">
+  <div class="pagehead">
+    <h1>日志</h1><span class="sub">跨服务请求流水 · 每 3 秒拉取</span>
+    <span class="sp"></span>
+    <button class="btn" id="pauseBtn">暂停滚动</button>
+  </div>
+
+  <div class="sect">
+    <div class="sect-head">
+      <span class="livedot" id="liveDot" style="width:7px;height:7px;border-radius:50%;background:var(--ok);animation:pulse 1.6s ease-in-out infinite"></span>
+      <h3>实时流水</h3><span class="sp"></span>
+      <div class="seg" id="logFilter">
+        <button class="on" data-s="all">全部</button><button data-s="workbuddy">workbuddy</button><button data-s="qoder">qoder</button><button data-s="cline">cline</button>
+      </div>
+    </div>
+    <div class="tbox"><table>
+      <thead><tr><th style="width:86px">时间</th><th style="width:110px">服务</th><th>模型</th><th class="num-r" style="width:64px">状态</th><th class="num-r" style="width:84px">耗时</th><th class="num-r" style="width:96px">Tokens</th></tr></thead>
+      <tbody id="logBody"></tbody>
+    </table></div>
+  </div>
+
+  <p style="font-size:11.5px;color:var(--faint)">只聚合请求流水；各服务运行日志（stdout）在对应服务详情页查看。</p>
+</div>
+<script src="app.js"></script>
+<script>
+var SVC=[
+  {id:'workbuddy',name:'WorkBuddy-free',color:'#2f9e5f',status:'running'},
+  {id:'qoder',name:'Qoder-free',color:'#3d6fd0',status:'running'},
+  {id:'cline',name:'Cline-free',color:'#c07427',status:'running'}
+];
+var NAMES=['deepseek-v3.2','glm-5.2','claude-sonnet-4-5','gpt-5-codex','kimi-k2','gemini-3-flash'];
+var logRows=[],paused=false;
+function mkRow(){
+  var s=SVC[Math.floor(Math.random()*3)];
+  var m=NAMES[Math.floor(Math.random()*NAMES.length)];
+  var bad=Math.random()<.08;
+  return {t:new Date().toTimeString().slice(0,8),s:s.name,m:m,c:bad?429:200,
+    d:(Math.random()*2.8+.3).toFixed(2)+'s',k:Math.floor(Math.random()*40000+800).toLocaleString()};
+}
+for(var i=0;i<12;i++)logRows.push(mkRow());
+function paintLog(){
+  var f=document.querySelector('#logFilter .on').dataset.s;
+  $('#logBody').innerHTML=logRows
+    .filter(function(r){return f==='all'||r.s.toLowerCase().indexOf(f)===0})
+    .map(function(r){
+      return '<tr'+(r.nw?' class="new"':'')+'><td>'+r.t+'</td><td><span class="chip">'+r.s+'</span></td><td class="m">'+r.m+'</td>'+
+      '<td class="num-r"><span class="code '+(r.c===200?'s':'w')+'">'+r.c+'</span></td><td class="num-r">'+r.d+'</td><td class="num-r">'+r.k+'</td></tr>';
+    }).join('');
+  logRows.forEach(function(r){r.nw=false});
+}
+paintLog();
+$('#logFilter').addEventListener('click',function(e){
+  var b=e.target.closest('button');if(!b)return;
+  this.querySelectorAll('button').forEach(function(x){x.classList.toggle('on',x===b)});paintLog();
+});
+$('#pauseBtn').addEventListener('click',function(){
+  paused=!paused;this.textContent=paused?'继续滚动':'暂停滚动';
+  $('#liveDot').classList.toggle('paused',paused);
+  $('#liveDot').style.animation=paused?'none':'';
+  $('#liveDot').style.background=paused?'var(--off)':'var(--ok)';
+});
+setInterval(function(){
+  if(paused)return;
+  logRows.unshift(mkRow());logRows=logRows.slice(0,30);paintLog();
+},3000);
+</script>
+</body>
+</html>

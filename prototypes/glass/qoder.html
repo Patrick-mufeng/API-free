@@ -1,0 +1,456 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Qoder-free · API-free</title>
+<link rel="stylesheet" href="glass.css">
+<style>
+  .stat6{display:grid;grid-template-columns:repeat(6,1fr);gap:26px;margin-bottom:34px}
+  .stat6 .kpi .v{font-size:24px}
+  .duo{display:grid;grid-template-columns:1.3fr 1fr;gap:44px}
+  .qrow{display:flex;align-items:center;gap:10px;padding:10px 2px;border-top:1px solid var(--line-soft)}
+  .qrow:first-of-type{border-top:1px solid var(--line)}
+  .qrow .ql{width:76px;font-size:12px;color:var(--muted);flex:none}
+  @media (max-width:900px){.stat6{grid-template-columns:repeat(3,1fr)}.duo{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="pagehead">
+    <svg width="34" height="34" viewBox="0 0 32 32" style="border:1px solid var(--line);border-radius:11px;background:#fff"><text x="16" y="21.5" text-anchor="middle" font-size="14" font-weight="700" fill="#1c1c1a" font-family="inherit">Q</text></svg>
+    <div>
+      <h1 style="margin:0;font-size:19px;font-weight:650">Qoder-free</h1>
+      <div class="sub">Go · 端口 8210 · 常驻进程 · 崩溃自动拉起已启用 · 累计自动重启 0 次</div>
+    </div>
+    <span class="st run" id="svcBadge"><i></i>运行中</span>
+    <span class="sp" style="flex:1"></span>
+    <button class="btn" id="refreshBtn">刷新</button>
+    <button class="btn" id="restartBtn">重启</button>
+    <button class="sw" role="switch" aria-checked="true" aria-label="服务开关" id="svcSwitch"></button>
+  </div>
+  <div class="confirm" id="svcConfirm" style="display:none;margin:-16px 0 26px">
+    <span>停止后该服务将不可用，进行中的请求会失败。</span><span style="flex:1"></span>
+    <button class="btn ghost" id="cfCancel">取消</button>
+    <button class="btn dgr" id="cfOk">确认停止</button>
+  </div>
+
+  <div class="tabs" id="svcTabs">
+    <button class="on" data-t="acct">账号池</button>
+    <button data-t="stats">用量统计</button>
+    <button data-t="models">模型</button>
+    <button data-t="config">配置</button>
+    <button data-t="logs">运行日志</button>
+  </div>
+
+  <!-- ================= 账号池 ================= -->
+  <div class="tabpanel on" id="tp-acct">
+    <div class="stat6">
+      <div class="kpi"><h3>账号总数</h3><div class="v">5</div></div>
+      <div class="kpi"><h3>可用</h3><div class="v" style="color:var(--ok)">2</div></div>
+      <div class="kpi"><h3>冷却中</h3><div class="v" style="color:var(--warn)">2</div></div>
+      <div class="kpi"><h3>已禁用</h3><div class="v" style="color:var(--bad)">1</div></div>
+      <div class="kpi"><h3>积分剩余 / 总额</h3><div class="v" style="font-size:19px">12,410.4 / 24,750.0</div></div>
+      <div class="kpi"><h3>粘性会话</h3><div class="v">2</div></div>
+    </div>
+
+    <div class="sect">
+      <div class="sect-head"><h3>OpenAI 接入</h3></div>
+      <div class="tbox"><table><tbody>
+        <tr><td style="width:120px"><b>Base URL</b></td>
+            <td><span class="m" id="baseUrl">http://127.0.0.1:8210/v1</span>
+                <button class="btn xs" data-copy="#baseUrl" style="margin-left:10px">复制</button></td></tr>
+        <tr><td></td><td class="muted" style="font-size:12px">API Key 使用 config.json 中的 api_key（/v1 接口鉴权用，面板本机开放无需填写）。模型列表见「模型」页。</td></tr>
+      </tbody></table></div>
+    </div>
+
+    <div class="sect">
+      <div class="sect-head">
+        <h3>账号池</h3><span class="sub">同一会话优先复用账号；cn: / global: 前缀强制区域</span>
+        <span class="sp"></span><span class="sub" id="accMeta">2 可用 / 5 总数 · 运行 6 时 12 分</span>
+      </div>
+      <div class="tbox"><table>
+        <thead><tr><th style="width:6px"></th><th style="width:170px">账号</th><th style="width:130px">状态</th><th style="width:190px">额度</th><th style="width:90px">成功 / 失败</th><th style="width:60px">在途</th><th style="width:96px">最近成功</th><th style="width:220px"></th></tr></thead>
+        <tbody id="acctBody"></tbody>
+      </table></div>
+    </div>
+  </div>
+
+  <!-- ================= 用量统计 ================= -->
+  <div class="tabpanel" id="tp-stats">
+    <div class="sect">
+      <div style="display:flex;align-items:flex-end;gap:34px;flex-wrap:wrap;padding:6px 0 14px;border-bottom:1px solid var(--line);margin-bottom:22px">
+        <div><div style="font-size:34px;font-weight:700;letter-spacing:-.02em" class="tok">1,284.6万 <span style="font-size:14px;color:var(--muted);font-weight:600">tok</span></div>
+             <div class="muted" style="font-size:12px;margin-top:2px">自统计启用起</div></div>
+        <div style="margin-left:auto;display:flex;gap:30px" class="tok">
+          <div><div style="font-size:17px;font-weight:650">796.4万</div><div class="faint" style="font-size:10.5px">输入 TOKEN</div></div>
+          <div><div style="font-size:17px;font-weight:650">488.2万</div><div class="faint" style="font-size:10.5px">输出 TOKEN</div></div>
+          <div><div style="font-size:17px;font-weight:650">3,412</div><div class="faint" style="font-size:10.5px">请求次数</div></div>
+          <div><div style="font-size:17px;font-weight:650">3</div><div class="faint" style="font-size:10.5px">活跃账号</div></div>
+        </div>
+      </div>
+      <p class="faint" style="font-size:11.5px;margin:0 0 22px">自统计功能启用起累计，不随下方保留窗口缩减；区间口径只作用于以下观测</p>
+    </div>
+
+    <div class="sect">
+      <div class="sect-head">
+        <div class="seg" id="rngChips"><button data-rng="today">今日</button><button data-rng="7d">近 7 天</button><button class="on" data-rng="30d">近 30 天</button></div>
+        <span class="sub" id="rngNote">最近 30 天</span>
+        <span class="sp"></span>
+      </div>
+      <div class="stat6" style="margin-bottom:26px">
+        <div class="kpi"><h3>区间 TOKEN</h3><div class="v" id="rTok">813.9万</div></div>
+        <div class="kpi"><h3>输入 TOKEN</h3><div class="v" id="rIn">504.6万</div></div>
+        <div class="kpi"><h3>输出 TOKEN</h3><div class="v" id="rOut">309.3万</div></div>
+        <div class="kpi"><h3>请求次数</h3><div class="v" id="rReq">1,189</div></div>
+        <div class="kpi"><h3>失败</h3><div class="v" style="color:var(--bad)" id="rFail">14</div></div>
+        <div class="kpi"><h3>消耗积分</h3><div class="v">—</div></div>
+      </div>
+      <div class="sect-head">
+        <h3>消费节律</h3>
+        <span class="sub">token 用量</span><span class="sub" style="color:rgba(28,28,26,.35)">▉ 请求次数</span>
+        <span class="sp"></span><span class="sub">按自然日</span>
+      </div>
+      <div class="chartbox" style="height:220px"><svg id="qdChart" viewBox="0 0 1000 220" preserveAspectRatio="none"></svg><div class="chart-tip" id="qdTip"></div></div>
+      <div class="faint" style="font-size:11.5px;margin-top:6px" id="chartReadout">— 悬停查看明细</div>
+    </div>
+
+    <div class="duo">
+      <div class="sect">
+        <div class="sect-head"><h3>模型分布</h3></div>
+        <div class="tbox"><table>
+          <thead><tr><th>模型</th><th class="num-r">TOKEN</th><th style="width:130px">占比</th><th class="num-r">请求</th><th class="num-r">输入 / 输出</th></tr></thead>
+          <tbody id="qModBody"></tbody>
+        </table></div>
+      </div>
+      <div class="sect">
+        <div class="sect-head"><h3>账号用量</h3></div>
+        <div class="tbox"><table>
+          <thead><tr><th>账号</th><th class="num-r">TOKEN</th><th style="width:110px">占比</th><th class="num-r">请求</th><th class="num-r">失败</th></tr></thead>
+          <tbody id="qAcctBody"></tbody>
+        </table></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 模型 ================= -->
+  <div class="tabpanel" id="tp-models">
+    <div class="sect">
+      <div class="sect-head">
+        <h3>模型目录</h3><span class="sub">来自就绪账号的实时 catalog</span>
+        <span class="sp"></span><span class="sub" id="mdNote">6 个模型 · 实时 catalog</span>
+        <button class="btn xs" id="mdRefresh">重新获取</button>
+      </div>
+      <div class="tbox"><table>
+        <thead><tr><th>模型 ID</th><th>显示名</th><th style="width:70px">区域</th><th style="width:90px">类型</th><th style="width:120px">计费</th></tr></thead>
+        <tbody id="mdBody"></tbody>
+      </table></div>
+    </div>
+  </div>
+
+  <!-- ================= 配置 ================= -->
+  <div class="tabpanel" id="tp-config">
+    <div class="sect">
+      <div class="sect-head"><h3>服务</h3><span class="sp"></span><span class="sub">config.json · 保存立即写入</span></div>
+      <div class="tbox"><table><tbody>
+        <tr><td style="width:190px"><b>监听地址</b><div class="muted" style="font-size:11.5px">修改需编辑 config.json 并重启进程</div></td>
+            <td><input type="text" value=":8210" readonly style="width:160px"></td></tr>
+        <tr><td><b>API 密钥（/v1 接口）</b><div class="muted" style="font-size:11.5px">面板本机开放无需鉴权；此密钥供 OpenAI 客户端使用</div></td>
+            <td><input type="text" value="qod_7f3a2b…​" readonly style="width:220px" id="qkey">
+                <button class="btn xs" id="qkeyCopy" style="margin-left:8px">复制</button></td></tr>
+      </tbody></table></div>
+    </div>
+
+    <div class="sect">
+      <div class="sect-head"><h3>账号池与流量治理</h3></div>
+      <div class="tbox"><table><tbody>
+        <tr><td style="width:190px"><b>单账号最大在途</b></td><td><input type="number" value="4" min="1" style="width:100px"></td></tr>
+        <tr><td><b>单请求轮换账号数</b></td><td><input type="number" value="3" min="1" style="width:100px"></td></tr>
+        <tr><td><b>限流冷却基数（秒）</b></td><td><input type="number" value="600" min="1" style="width:100px"></td></tr>
+        <tr><td><b>会话粘性路由</b></td><td><button class="sw" role="switch" aria-checked="true"></button></td></tr>
+        <tr><td><b>按天用量统计</b></td><td><button class="sw" role="switch" aria-checked="true"></button></td></tr>
+        <tr><td><b>统计保留天数</b></td><td><input type="number" value="30" min="1" style="width:100px"></td></tr>
+      </tbody></table></div>
+    </div>
+
+    <div class="sect">
+      <div class="sect-head"><h3>上游</h3></div>
+      <div class="tbox"><table><tbody>
+        <tr><td style="width:190px"><b>出站代理</b><div class="muted" style="font-size:11.5px">传给每账号 worker；立即对新建连接生效</div></td>
+            <td><input type="text" placeholder="http://127.0.0.1:7890（留空直连）" style="width:300px"></td></tr>
+      </tbody></table></div>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:10px;margin-top:4px">
+      <span class="muted" style="font-size:12px" id="cfgNote"></span>
+      <span style="flex:1"></span>
+      <button class="btn" id="cfgDiscard">放弃修改</button>
+      <button class="btn pri" id="cfgSave">保存配置</button>
+    </div>
+  </div>
+
+  <!-- ================= 运行日志 ================= -->
+  <div class="tabpanel" id="tp-logs">
+    <div class="sect">
+      <div class="sect-head">
+        <div class="seg" id="logCh"><button class="on" data-ch="all">全部</button><button data-ch="chat">对话</button><button data-ch="worker">worker</button><button data-ch="sys">系统</button></div>
+        <span class="sp"></span><span class="sub">最近 800 行</span>
+        <button class="btn xs" id="autoScrollBtn">自动滚动：开</button>
+      </div>
+      <pre class="logpre" id="qlog"></pre>
+    </div>
+  </div>
+</div>
+
+<!-- 添加账号 / 设备授权 -->
+<div class="veil" id="addVeil" role="dialog" aria-modal="true">
+  <div class="modal">
+    <h3>添加账号</h3>
+    <p class="sub">浏览器完成 Qoder 设备授权，凭证由 worker 写入账号数据目录，无需重启。</p>
+    <div id="addForm">
+      <div style="margin-bottom:12px"><b style="font-size:13px">版本：</b>
+        <label class="check" style="margin-right:16px"><input type="radio" name="qregion" checked> 国内版（cn）</label>
+        <label class="check"><input type="radio" name="qregion"> 国际版（global）</label></div>
+      <div style="margin-bottom:6px"><b style="font-size:13px">名称（可选）</b></div>
+      <input type="text" placeholder="默认按区域命名" style="width:100%">
+      <p class="faint" style="font-size:11.5px;margin:8px 0 0">国际版需先安装 @qoder-ai/qodercli 并在 config.json 配置 qoder_cli_js。</p>
+    </div>
+    <div id="addWaiting" style="display:none">
+      <p style="font-size:13px" id="waitText">正在获取授权链接<span class="cursor-blink"></span></p>
+      <div id="addLinkRow" style="display:none">
+        <p style="font-size:13px;margin:10px 0 0">在浏览器打开以下链接并登录：</p>
+        <div class="linkbox" id="authUrl">https://qoder.com/oauth/device?code=WDJB-MJHT</div>
+        <p class="muted" style="font-size:12.5px">等待授权完成，自动检测中<span class="cursor-blink"></span></p>
+      </div>
+    </div>
+    <div id="addDone" style="display:none;text-align:center">
+      <div class="okbig">✓</div>
+      <p style="font-size:13.5px;font-weight:600;margin:0">登录成功，worker 将自动就绪。</p>
+    </div>
+    <div class="acts">
+      <button class="btn" data-close>关闭</button>
+      <button class="btn" id="btnCopyLink" style="display:none" data-copy="#authUrl">复制链接</button>
+      <button class="btn" id="btnOpenLink" style="display:none">在浏览器打开</button>
+      <button class="btn pri" id="btnGetLink">获取授权链接</button>
+    </div>
+  </div>
+</div>
+
+<!-- 额度 -->
+<div class="veil" id="quotaVeil" role="dialog" aria-modal="true">
+  <div class="modal" style="width:min(480px,calc(100vw - 40px))">
+    <h3>额度 <span class="muted" style="font-size:12.5px;font-weight:500" id="quotaWho"></span></h3>
+    <p class="sub">来自 worker 实时查询；剩余 = 可用桶之和（基础 + 加量包 + 组织包）。</p>
+    <div class="qrow"><span class="ql"><b style="color:var(--text);font-size:12.5px">剩余 / 总额</b></span>
+      <div style="flex:1"><div class="tok" style="font-size:13px">1,240.50 / 4,950.00（25%）</div><div class="bar slim" style="margin-top:5px"><i style="width:25%"></i></div></div></div>
+    <div class="qrow"><span class="ql">基础额度</span>
+      <div style="flex:1"><div class="tok muted" style="font-size:12.5px">980.20 / 4,000.00 credits</div><div class="bar slim" style="margin-top:5px"><i style="width:24%"></i></div></div></div>
+    <div class="qrow"><span class="ql">加量包</span>
+      <div style="flex:1"><div class="tok muted" style="font-size:12.5px">210.30 / 750.00 credits</div><div class="bar slim" style="margin-top:5px"><i style="width:28%"></i></div></div></div>
+    <div class="qrow"><span class="ql">组织包</span>
+      <div style="flex:1"><div class="tok muted" style="font-size:12.5px">50.00 / 200.00 credits</div><div class="bar slim" style="margin-top:5px"><i style="width:25%"></i></div></div></div>
+    <div class="acts">
+      <button class="btn" id="quotaRefresh">强制刷新</button>
+      <button class="btn pri" data-close>关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- 删除确认 -->
+<div class="veil" id="delVeil" role="dialog" aria-modal="true">
+  <div class="modal" style="width:min(420px,calc(100vw - 40px))">
+    <h3>删除账号</h3>
+    <p class="sub" id="delText">删除账号「xxx」？（仅移除注册信息，凭证目录 data/homes 保留）</p>
+    <div class="acts">
+      <button class="btn" data-close>取消</button>
+      <button class="btn dgr" id="delYes">删除</button>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+<script>
+/* ---------- 账号池 ---------- */
+var ACCTS=[
+  {nm:'上午好_01',rg:'CN',st:'ok',stT:'就绪',q:'1,240.50 / 4,950.00',p:25,ok:83,bad:0,inf:'0/4',ago:'3 分钟前',oauth:true},
+  {nm:'global_dev',rg:'GL',st:'rate',stT:'限流冷却',q:'2,102.10 / 4,950.00',p:42,ok:47,bad:12,inf:'2/4',ago:'12 分钟前',oauth:true,err:'upstream 429: rate limited, retry after 600s'},
+  {nm:'qod_9f21c8e4',rg:'CN',st:'mute',stT:'未登录',q:null,ok:0,bad:0,inf:'0/4',ago:'—',oauth:false},
+  {nm:'breaker_gl',rg:'GL',st:'bad',stT:'熔断',q:'864.00 / 4,950.00',p:17,ok:31,bad:9,inf:'0/4',ago:'1 小时前',oauth:true},
+  {nm:'legacy_cn',rg:'CN',st:'dis',stT:'已禁用',q:'964.30 / 4,950.00',p:19,ok:19,bad:1,inf:'0/4',ago:'2 天前',oauth:true,dis:true}
+];
+function rowCls(a){return a.dis?'off-row':(a.st==='rate'||a.st==='credit')?'cool-row':a.st==='bad'?'cool-row':''}
+$('#acctBody').innerHTML=ACCTS.map(function(a,i){
+  var ops='<button class="btn xs" data-quota="'+i+'">额度</button> ';
+  if(a.rg==='CN'&&!a.dis)ops+='<button class="btn xs" data-op="签到完成">签到</button> ';
+  ops+=a.oauth?'<button class="btn xs" data-op="已请求重建上下文">重建</button> ':'<button class="btn xs pri" data-op="登录">登录</button> ';
+  ops+=a.dis?'<button class="btn xs" data-op="已启用">启用</button> ':'<button class="btn xs" data-op="已禁用">禁用</button> ';
+  ops+='<button class="btn xs del" data-del="'+i+'">删除</button>';
+  return '<tr class="'+rowCls(a)+'">'+
+    '<td><span class="mark" style="'+(a.dis?'background:var(--bad)':a.st==='rate'||a.st==='bad'?'background:var(--warn)':'')+'"></span></td>'+
+    '<td><b style="font-size:13px">'+a.nm+'</b> <span class="chip">'+a.rg+'</span>'+(a.err?'<div class="code b" style="display:block;margin-top:3px;font-weight:500" title="'+a.err+'">'+a.err.slice(0,42)+'</div>':'')+'</td>'+
+    '<td><span class="st '+a.st+'"><i></i>'+a.stT+'</span></td>'+
+    '<td>'+(a.q?'<span class="tok" style="font-size:12.5px">'+a.q.split(' / ')[0]+'</span><span class="faint"> / '+a.q.split(' / ')[1]+'</span><div class="bar slim" style="margin-top:4px;max-width:150px"><i style="width:'+a.p+'%"></i></div>':'—')+'</td>'+
+    '<td>'+a.ok+' / <span style="color:'+(a.bad?'var(--bad)':'inherit')+'">'+a.bad+'</span></td>'+
+    '<td>'+a.inf+'</td><td class="muted">'+a.ago+'</td>'+
+    '<td class="num-r" style="white-space:nowrap">'+ops+'</td></tr>';
+}).join('');
+
+$('#acctBody').addEventListener('click',function(e){
+  var b=e.target.closest('button');if(!b)return;
+  if(b.dataset.quota!=null){$('#quotaWho').textContent='· '+ACCTS[+b.dataset.quota].nm;openVeil($('#quotaVeil'));return}
+  if(b.dataset.del!=null){$('#delText').textContent='删除账号「'+ACCTS[+b.dataset.del].nm+'」？（仅移除注册信息，凭证目录 data/homes 保留）';openVeil($('#delVeil'));return}
+  if(b.dataset.op){toast(b.dataset.op,'ok')}
+});
+$('#delYes').addEventListener('click',function(){closeVeil($('#delVeil'));toast('已删除','ok')});
+$('#quotaRefresh').addEventListener('click',function(){toast('已强制刷新（worker 实时查询）','ok')});
+$('#refreshBtn').addEventListener('click',function(){toast('账号池已刷新','ok')});
+
+/* 服务开关 / 重启 */
+var svcSwitch=$('#svcSwitch'),svcBadge=$('#svcBadge'),svcConfirm=$('#svcConfirm');
+svcSwitch.addEventListener('click',function(){
+  if(svcSwitch.getAttribute('aria-checked')==='true'){svcConfirm.style.display='flex'}
+  else bootMain();
+});
+$('#cfCancel').onclick=function(){svcConfirm.style.display='none'};
+$('#cfOk').onclick=function(){
+  svcConfirm.style.display='none';
+  svcSwitch.disabled=true;svcBadge.className='st stop';svcBadge.innerHTML='<i></i>停止中…';
+  setTimeout(function(){svcSwitch.setAttribute('aria-checked','false');svcSwitch.disabled=false;svcBadge.className='st stop';svcBadge.innerHTML='<i></i>已停止'},900);
+};
+function bootMain(){
+  svcSwitch.disabled=true;svcBadge.className='st boot';svcBadge.innerHTML='<i></i>启动中…';
+  setTimeout(function(){svcSwitch.disabled=false;svcSwitch.setAttribute('aria-checked','true');svcBadge.className='st run';svcBadge.innerHTML='<i></i>运行中'},1300);
+}
+$('#restartBtn').addEventListener('click',function(){
+  if(svcSwitch.getAttribute('aria-checked')!=='true')return bootMain();
+  svcSwitch.disabled=true;svcBadge.className='st boot';svcBadge.innerHTML='<i></i>重启中…';
+  setTimeout(function(){svcSwitch.disabled=false;svcBadge.className='st run';svcBadge.innerHTML='<i></i>运行中'},1400);
+});
+
+/* ---------- 用量统计 ---------- */
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+var DAYS=30;
+function gen(seed,base,amp){var r=mulberry32(seed),out=[];for(var i=0;i<DAYS;i++){var wk=(i%7===5||i%7===6)?.55:1;out.push(Math.round((base+amp*r())*wk*(0.75+0.25*Math.sin(i/4))))}return out}
+var SERIES=gen(11,420000,220000);
+var REQS=SERIES.map(function(v){return Math.round(v/2900)});
+var LABELS=SERIES.map(function(_,i){return dayLabel(i,DAYS)});
+function drawQd(){chart($('#qdChart'),$('#qdTip'),[{name:'qoder',color:'#3d6fd0',data:SERIES}],'area',LABELS,{reqData:REQS,onHover:function(i){var h='<b>'+LABELS[i]+'</b>'+fmtTok(SERIES[i])+' tok · '+fmtInt(REQS[i])+' 次';return h}})}
+drawQd();
+$('#rngChips').addEventListener('click',function(e){
+  var b=e.target.closest('button');if(!b)return;
+  this.querySelectorAll('button').forEach(function(x){x.classList.toggle('on',x===b)});
+  var rng=b.dataset.rng;
+  $('#rngNote').textContent=rng==='today'?'仅今天':rng==='7d'?'最近 7 天':'最近 30 天';
+  var k=rng==='today'?1:rng==='7d'?7:DAYS;
+  var slice=SERIES.slice(DAYS-k);
+  var tot=slice.reduce(function(a,b){return a+b},0);
+  $('#rTok').textContent=fmtTok(tot);
+  $('#rIn').textContent=fmtTok(Math.round(tot*0.62));
+  $('#rOut').textContent=fmtTok(Math.round(tot*0.38));
+  $('#rReq').textContent=fmtInt(Math.round(tot/2900));
+  $('#rFail').textContent=fmtInt(Math.round(tot/2900*0.012));
+  $('#chartReadout').textContent='— 悬停查看明细';
+  drawQd();
+});
+$('#qModBody').innerHTML=[
+  ['kimi-k2','521.4万','41%',1402,'323.1万 / 198.3万'],
+  ['deepseek-v3.2','388.9万','30%',988,'241.2万 / 147.7万'],
+  ['glm-5.2','205.5万','16%',522,'127.4万 / 78.1万'],
+  ['qoder-max','168.8万','13%',501,'104.7万 / 64.1万']
+].map(function(m){
+  return '<tr><td class="m" style="font-weight:600">'+m[0]+'</td><td class="num-r">'+m[1]+'</td>'+
+  '<td><div style="display:flex;align-items:center;gap:8px"><span class="tok muted" style="font-size:12px">'+m[2]+'</span><div class="bar"><i style="width:'+m[2]+'"></i></div></div></td>'+
+  '<td class="num-r">'+fmtInt(m[3])+'</td><td class="num-r muted">'+m[4]+'</td></tr>';
+}).join('');
+$('#qAcctBody').innerHTML=[
+  ['上午好_01','689.3万','54%',1834,0],
+  ['global_dev','412.7万','32%',1101,12],
+  ['breaker_gl','182.6万','14%',477,2]
+].map(function(m){
+  return '<tr><td style="font-weight:600">'+m[0]+'</td><td class="num-r">'+m[1]+'</td>'+
+  '<td><div style="display:flex;align-items:center;gap:8px"><span class="tok muted" style="font-size:12px">'+m[2]+'</span><div class="bar"><i style="width:'+m[2]+'"></i></div></div></td>'+
+  '<td class="num-r">'+fmtInt(m[3])+'</td><td class="num-r" style="color:'+(m[4]?'var(--bad)':'var(--faint)')+'">'+fmtInt(m[4])+'</td></tr>';
+}).join('');
+
+/* ---------- 模型 ---------- */
+$('#mdBody').innerHTML=[
+  ['kimi-k2','Kimi K2 Instruct','CN','标准','免费'],
+  ['kimi-k2-thinking','Kimi K2 Thinking','CN','推理','免费'],
+  ['deepseek-v3.2','DeepSeek V3.2','GL','标准','按额度'],
+  ['deepseek-r2','DeepSeek R2','GL','推理','按额度'],
+  ['glm-5.2','GLM 5.2','CN','标准','¥0.002 / 1k tok'],
+  ['glm-5.3-flash','GLM 5.3 Flash','CN','推理','免费']
+].map(function(m){
+  return '<tr><td class="m">'+m[0]+'</td><td>'+(m[1]||'—')+'</td>'+
+  '<td><span class="chip">'+m[2]+'</span></td>'+
+  '<td>'+(m[3]==='推理'?'<span class="st warn"><i></i>推理</span>':'<span class="st mute"><i></i>标准</span>')+'</td>'+
+  '<td>'+(m[4]==='免费'?'<span class="st ok"><i></i>免费</span>':m[4]==='按额度'?'<span class="st mute"><i></i>按额度</span>':'<span class="st mute"><i></i>'+m[4]+'</span>')+'</td></tr>';
+}).join('');
+$('#mdRefresh').addEventListener('click',function(){toast('catalog 已重新获取','ok')});
+
+/* ---------- 配置 ---------- */
+$('#cfgSave').addEventListener('click',function(){toast('配置已保存','ok')});
+$('#cfgDiscard').addEventListener('click',function(){$('#cfgNote').textContent='已还原为上次保存的配置'});
+$('#qkeyCopy').addEventListener('click',function(){toast('API key 已复制','ok')});
+
+/* ---------- 运行日志 ---------- */
+var LOGS=[
+  ['chat','16:02:58','200 glm-5.2 stream 2.31s 12,804 tok'],
+  ['chat','16:02:31','429 deepseek-v3.2 限流冷却，切换账号'],
+  ['worker','16:02:07','worker qod_9f21c8e4 warmup 完成'],
+  ['sys','16:01:44','rotate: 选中 上午好_01（粘性会话命中）'],
+  ['chat','15:58:41','200 kimi-k2 stream 1.12s 6,032 tok'],
+  ['worker','15:57:03','账号 global_dev 触发限流冷却，600s 后重试'],
+  ['sys','15:55:29','stats: 落盘 2026-10-06.json'],
+  ['chat','15:52:10','200 kimi-k2-thinking stream 3.02s 18,410 tok'],
+  ['worker','15:49:55','error: breaker_gl 连续失败 3 次，熔断 30m'],
+  ['sys','15:47:20','面板 API GET /overview 200 3ms']
+];
+function renderLog(ch){
+  $('#qlog').innerHTML=LOGS.filter(function(l){return ch==='all'||l[0]===ch}).map(function(l){
+    var cls=/error|失败|429|熔断/.test(l[2])?'l-err':/冷却|warn/.test(l[2])?'l-warn':'';
+    return '<div class="'+cls+'"><span class="l-ch '+l[0]+'">'+(l[0]==='chat'?'对话':l[0]==='worker'?'worker':'系统')+'</span>'+l[1]+'  '+l[2]+'</div>';
+  }).join('');
+}
+renderLog('all');
+$('#logCh').addEventListener('click',function(e){
+  var b=e.target.closest('button');if(!b)return;
+  this.querySelectorAll('button').forEach(function(x){x.classList.toggle('on',x===b)});
+  renderLog(b.dataset.ch);
+});
+$('#autoScrollBtn').addEventListener('click',function(){
+  var on=this.textContent.endsWith('开');
+  this.textContent=on?'自动滚动：关':'自动滚动：开';
+});
+
+/* ---------- 添加账号弹层 ---------- */
+initTabs('#svcTabs');
+var addVeil=$('#addVeil');wireVeil(addVeil);
+/* 顶部添加账号入口：pagehead 里放一个按钮 */
+var addBtn=document.createElement('button');
+addBtn.className='btn pri';addBtn.textContent='添加账号';
+addBtn.addEventListener('click',function(){resetAdd();openVeil(addVeil)});
+$('#refreshBtn').parentNode.insertBefore(addBtn,$('#refreshBtn'));
+function resetAdd(){
+  $('#addForm').style.display='';$('#addWaiting').style.display='none';$('#addDone').style.display='none';
+  $('#addLinkRow').style.display='none';$('#btnGetLink').style.display='';$('#btnGetLink').disabled=false;
+  $('#btnCopyLink').style.display='none';$('#btnOpenLink').style.display='none';
+}
+$('#btnGetLink').addEventListener('click',function(){
+  this.disabled=true;
+  $('#addForm').style.display='none';$('#addWaiting').style.display='';
+  setTimeout(function(){
+    $('#addLinkRow').style.display='';
+    $('#btnCopyLink').style.display='';$('#btnOpenLink').style.display='';
+    setTimeout(function(){
+      $('#addWaiting').style.display='none';$('#addDone').style.display='';
+      $('#btnCopyLink').style.display='none';$('#btnOpenLink').style.display='none';$('#btnGetLink').style.display='none';
+      setTimeout(function(){closeVeil(addVeil);toast('账号已入池，worker 拉起中','ok')},1400);
+    },2200);
+  },900);
+});
+$('#btnOpenLink').addEventListener('click',function(){toast('原型：实际环境将以原生 <a target=_blank> 打开授权页')});
+</script>
+</body>
+</html>

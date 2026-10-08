@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Qoder-free · 控制面板（设计语言取自 workbuddy-free，MIT）
+     单文件前端，go:embed 进二进制；脚本体在 app.js，不写内联脚本。 -->
+<title>qoder-free · 控制台</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%230b0e14'/%3E%3Cg fill='%232ad4e8'%3E%3Crect x='3' y='2' width='10' height='1'/%3E%3Crect x='2' y='3' width='2' height='1'/%3E%3Crect x='12' y='3' width='2' height='1'/%3E%3Crect x='2' y='4' width='12' height='4'/%3E%3Crect x='5' y='8' width='2' height='2'/%3E%3Crect x='9' y='8' width='2' height='2'/%3E%3Crect x='4' y='10' width='3' height='1'/%3E%3Crect x='9' y='10' width='3' height='1'/%3E%3Crect x='3' y='11' width='10' height='1'/%3E%3Crect x='11' y='12' width='3' height='2'/%3E%3C/g%3E%3C/svg%3E">
+<style>
+/* ── 设计令牌：PIXEL OPS（与 workbuddy-free 同族）────────────────────── */
+:root {
+  color-scheme: dark;
+  --bg: #0b0e14; --surface: #11161f; --surface-2: #171d28; --raise: #1d2533;
+  --line: #2d3849; --line-soft: #212a38;
+  --ink: #dce7f2; --ink-2: #94a5ba; --ink-3: #61738a;
+  --accent: #2ad4e8; --accent-ink: #04161a; --accent-soft: rgba(42,212,232,.12);
+  --ok: #46d67f; --ok-soft: rgba(70,214,127,.12);
+  --warn: #f5b544; --warn-soft: rgba(245,181,68,.12);
+  --bad: #ff5d6c; --bad-soft: rgba(255,93,108,.12);
+  --inset: rgba(0,0,0,.28);
+  --shadow: 4px 4px 0 0 rgba(0,0,0,.5);
+  --shadow-sm: 3px 3px 0 0 rgba(0,0,0,.45);
+  --shadow-lg: 8px 8px 0 0 rgba(0,0,0,.6);
+  --grid: rgba(42,212,232,.045);
+  --grid-step: 34px;
+  --scan: rgba(0,0,0,.24);
+  --scan-opacity: .5;
+  --mono: ui-monospace, "Cascadia Mono", "JetBrains Mono", "SF Mono", Consolas, "Courier New", monospace;
+  --sans: var(--mono);
+  --z-sticky: 20; --z-veil: 60; --z-toast: 90; --z-fx: 200;
+}
+[data-theme="light"] {
+  color-scheme: light;
+  --bg: #e9edf3; --surface: #ffffff; --surface-2: #f1f4f9; --raise: #ffffff;
+  --line: #b7c2d3; --line-soft: #d9e1ea;
+  --ink: #0c1119; --ink-2: #43536a; --ink-3: #78899e;
+  --accent: #0b7f96; --accent-ink: #ffffff; --accent-soft: rgba(11,127,150,.1);
+  --ok: #0f7a48; --ok-soft: rgba(15,122,72,.1);
+  --warn: #96600a; --warn-soft: rgba(150,96,10,.1);
+  --bad: #c02b34; --bad-soft: rgba(192,43,52,.09);
+  --inset: rgba(12,17,25,.06);
+  --shadow: 4px 4px 0 0 rgba(12,17,25,.16);
+  --shadow-sm: 3px 3px 0 0 rgba(12,17,25,.14);
+  --shadow-lg: 8px 8px 0 0 rgba(12,17,25,.2);
+  --grid: rgba(11,127,150,.06);
+  --scan-opacity: 0;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body {
+  background: var(--bg); color: var(--ink); font: 13px/1.6 var(--mono);
+  -webkit-font-smoothing: antialiased;
+}
+body::before {
+  content: ""; position: fixed; inset: 0; z-index: var(--z-fx); pointer-events: none;
+  background-image:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: var(--grid-step) var(--grid-step);
+}
+body::after {
+  content: ""; position: fixed; inset: 0; z-index: var(--z-fx); pointer-events: none;
+  background: repeating-linear-gradient(0deg, var(--scan) 0 1px, transparent 1px 3px);
+  opacity: var(--scan-opacity);
+}
+::selection { background: var(--accent); color: var(--accent-ink); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+* { scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+::-webkit-scrollbar { width: 12px; height: 12px; }
+::-webkit-scrollbar-track { background: var(--surface-2); }
+::-webkit-scrollbar-thumb { background: var(--line); border: 2px solid var(--surface-2); }
+::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+/* ── 壳层 ─────────────────────────────────────────────────────────── */
+.shell { display: grid; grid-template-columns: 216px 1fr; min-height: 100vh; position: relative; z-index: 1; }
+.nav {
+  background: var(--surface); border-right: 2px solid var(--line);
+  display: flex; flex-direction: column; position: sticky; top: 0; height: 100vh;
+}
+.brand { padding: 17px 15px 14px; border-bottom: 2px solid var(--line); }
+.brand .name {
+  font-weight: 700; letter-spacing: .1em; font-size: 12.5px; text-transform: uppercase;
+  display: flex; align-items: center; gap: 8px;
+}
+.brand .logo { width: 18px; height: 18px; flex: none; fill: var(--accent); }
+.brand .sub { color: var(--ink-3); font-size: 10.5px; font-family: var(--mono); margin-top: 4px; letter-spacing: .14em; }
+.nav ul { list-style: none; padding: 9px 9px; flex: 1; }
+.nav a {
+  display: flex; align-items: center; gap: 9px; padding: 7px 10px; margin-bottom: 3px;
+  color: var(--ink-2); text-decoration: none; font-size: 12.5px;
+  border: 2px solid transparent; letter-spacing: .02em;
+}
+.nav a:hover { background: var(--surface-2); color: var(--ink); border-color: var(--line-soft); }
+.nav a.on {
+  background: var(--accent-soft); color: var(--accent); font-weight: 700;
+  border-color: var(--accent); box-shadow: inset 4px 0 0 0 var(--accent);
+}
+.nav a svg { width: 15px; height: 15px; flex: none; opacity: .9; }
+.nav .sig { padding: 11px 15px; border-top: 2px solid var(--line); font-size: 11px; color: var(--ink-3); }
+.nav .sig .row { display: flex; align-items: center; gap: 7px; }
+.nav .sig .credit { margin-top: 7px; letter-spacing: .08em; opacity: .8; }
+.chips { display: inline-flex; gap: 5px; align-items: center; }
+.chips .chip { padding: 2px 9px; }
+.chips .chip.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 700; }
+.ln .lch { font-style: normal; display: inline-block; font-size: 10px; line-height: 1; padding: 2px 5px; margin-right: 8px; vertical-align: 1px; font-weight: 700; }
+.ln .lch.c-worker { background: var(--accent-soft); color: var(--accent); }
+.ln .lch.c-chat { background: var(--ok-soft); color: var(--ok); }
+.ln .lch.c-sys { background: var(--surface-2); color: var(--ink-3); }
+.pulse { width: 8px; height: 8px; background: var(--ok); flex: none; box-shadow: 0 0 0 2px var(--ok-soft); }
+.pulse.bad { background: var(--bad); box-shadow: 0 0 0 2px var(--bad-soft); }
+.pulse.warn { background: var(--warn); box-shadow: 0 0 0 2px var(--warn-soft); }
+
+.main { min-width: 0; display: flex; flex-direction: column; }
+.topbar {
+  display: flex; align-items: center; gap: 12px; padding: 13px 22px;
+  border-bottom: 2px solid var(--line); background: var(--surface);
+  position: sticky; top: 0; z-index: var(--z-sticky);
+}
+.topbar h2 { font-size: 13px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+.topbar .sep { color: var(--accent); font-weight: 700; }
+.topbar .meta { color: var(--ink-3); font-size: 11.5px; font-family: var(--mono); }
+.topbar .grow { flex: 1; }
+.view { padding: 20px 22px 60px; max-width: 1240px; width: 100%; }
+.view[hidden] { display: none; }
+
+/* ── 控件 ─────────────────────────────────────────────────────────── */
+button {
+  font: inherit; font-size: 12.5px; letter-spacing: .02em;
+  color: var(--ink); background: var(--surface-2);
+  border: 2px solid var(--line); padding: 6px 12px; cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: transform .07s steps(2), box-shadow .07s steps(2),
+              background .12s, border-color .12s, color .12s;
+}
+button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+button:active:not(:disabled) { transform: translate(3px, 3px); box-shadow: 0 0 0 0 transparent; }
+button:disabled { opacity: .45; cursor: default; }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 700; }
+button.primary:hover:not(:disabled) { filter: brightness(1.12); color: var(--accent-ink); }
+button.ghost { background: transparent; }
+button.danger { color: var(--bad); }
+button.danger:hover:not(:disabled) { border-color: var(--bad); color: var(--bad); }
+button.xs { padding: 3px 8px; font-size: 11.5px; box-shadow: 2px 2px 0 0 rgba(0,0,0,.4); }
+button.xs:active:not(:disabled) { transform: translate(2px, 2px); }
+button.icon { padding: 6px 8px; }
+input, select {
+  font: inherit; font-size: 12.5px; color: var(--ink); background: var(--bg);
+  border: 2px solid var(--line); padding: 6px 10px; width: 100%;
+  box-shadow: inset 2px 2px 0 0 var(--inset);
+  transition: border-color .12s, box-shadow .12s;
+}
+input:focus, select:focus { outline: none; border-color: var(--accent); }
+input[type=checkbox], input[type=radio] { width: auto; padding: 0; accent-color: var(--accent); box-shadow: none; flex: none; }
+input[type=checkbox] { width: 16px; height: 16px; }
+input[type=radio] { appearance: none; -webkit-appearance: none; width: 15px; height: 15px; border: 2px solid var(--line); background: var(--bg); cursor: pointer; transition: border-color .12s, background .12s; }
+input[type=radio]:checked { border-color: var(--accent); background: var(--accent); box-shadow: inset 0 0 0 2px var(--bg); }
+input:disabled { opacity: .6; }
+label.fld { display: block; margin-bottom: 14px; }
+label.fld > .lb { display: block; font-size: 11.5px; color: var(--ink-2); margin-bottom: 5px; letter-spacing: .04em; }
+label.fld > .hint { display: block; font-size: 11px; color: var(--ink-3); margin-top: 4px; }
+.inline { display: flex; align-items: center; gap: 9px; }
+.inline > input { min-width: 0; }
+.inline > button { flex: none; }
+
+/* ── 统计条 ───────────────────────────────────────────────────────── */
+.stats {
+  display: grid; grid-template-columns: repeat(6, 1fr);
+  border: 2px solid var(--line); background: var(--surface);
+  overflow: hidden; margin-bottom: 18px; box-shadow: var(--shadow);
+}
+@media (max-width: 980px) { .stats { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 560px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+.stat { padding: 13px 15px; border-right: 1px solid var(--line-soft); border-bottom: 1px solid var(--line-soft); }
+.stat .v { font: 700 24px/1.15 var(--mono); font-variant-numeric: tabular-nums; letter-spacing: -.01em; white-space: nowrap; }
+.stat .k { color: var(--ink-3); font-size: 10.5px; margin-top: 5px; letter-spacing: .1em; }
+.stat.good .v { color: var(--ok); } .stat.warn .v { color: var(--warn); } .stat.bad .v { color: var(--bad); }
+
+/* ── 面板块 ───────────────────────────────────────────────────────── */
+.box {
+  background: var(--surface); border: 2px solid var(--line);
+  box-shadow: var(--shadow); margin-bottom: 18px; overflow: hidden;
+}
+.box > header {
+  display: flex; align-items: center; gap: 11px; padding: 10px 15px;
+  border-bottom: 2px solid var(--line); background: var(--surface-2);
+}
+.box > header h3 { font-size: 12px; font-weight: 700; letter-spacing: .06em; display: flex; align-items: center; gap: 8px; }
+.box > header h3::before {
+  content: ""; width: 8px; height: 8px; flex: none; background: var(--accent);
+  clip-path: polygon(0 0, 100% 0, 100% 55%, 55% 55%, 55% 100%, 0 100%);
+}
+.box > header h3 .hint { color: var(--ink-3); font-weight: 400; font-size: 11px; letter-spacing: 0; }
+.box > header .grow { flex: 1; }
+.box > header .note { color: var(--ink-3); font-size: 11.5px; }
+.box .pad { padding: 16px; }
+
+/* ── 账号表 ───────────────────────────────────────────────────────── */
+.tbl-wrap { overflow-x: auto; }
+.acc { width: 100%; border-collapse: collapse; font-size: 12.5px; min-width: 640px; }
+.acc th {
+  text-align: left; font-weight: 700; font-size: 10.5px; color: var(--ink-3);
+  padding: 8px 10px; border-bottom: 2px solid var(--line); white-space: nowrap;
+  letter-spacing: .08em; text-transform: uppercase; background: var(--surface-2);
+}
+.acc td { padding: 10px; border-bottom: 1px solid var(--line-soft); vertical-align: middle; }
+.acc tr:last-child td { border-bottom: none; }
+.acc tbody tr:hover { background: var(--surface-2); }
+.acc .mark { width: 4px; min-width: 4px; padding: 0; }
+.acc .mark i { display: block; width: 4px; height: 100%; min-height: 38px; background: var(--ok); }
+.acc tbody tr.cool .mark i { background: var(--warn); }
+.acc tbody tr.off .mark i { background: var(--bad); }
+.acc.md .mark { display: none; }
+.acc .c-acts { width: 1px; white-space: nowrap; }
+.acc.md { min-width: 700px; }
+.acc.md th, .acc.md td { padding: 9px 8px; }
+.who { min-width: 118px; max-width: 200px; }
+.who .nm { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.who .id { font-family: var(--mono); font-size: 11px; color: var(--ink-3); margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.realm-tag {
+  display: inline-block; margin-left: 6px; padding: 1px 5px; font: 700 9.5px/1.5 var(--mono);
+  color: var(--accent); background: var(--accent-soft);
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  vertical-align: 1px; letter-spacing: .06em; text-transform: uppercase;
+}
+.num { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cred { min-width: 92px; }
+.cred .n { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 12.5px; white-space: nowrap; }
+.cred .n .of { color: var(--ink-3); font-size: 11px; }
+.bar { height: 8px; background: var(--bg); border: 1px solid var(--line); margin-top: 6px; overflow: hidden; max-width: 92px; }
+.bar i { display: block; height: 100%; transform-origin: left; background-image: repeating-linear-gradient(90deg, var(--accent) 0 3px, transparent 3px 5px); }
+.tag {
+  display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px;
+  font-size: 10.5px; font-weight: 700; white-space: nowrap; letter-spacing: .05em;
+  border: 1px solid transparent;
+}
+.tag.ok { background: var(--ok-soft); color: var(--ok); border-color: color-mix(in srgb, var(--ok) 35%, transparent); }
+.tag.warn { background: var(--warn-soft); color: var(--warn); border-color: color-mix(in srgb, var(--warn) 35%, transparent); }
+.tag.bad { background: var(--bad-soft); color: var(--bad); border-color: color-mix(in srgb, var(--bad) 35%, transparent); }
+.tag.mute { background: var(--surface-2); color: var(--ink-3); border-color: var(--line); }
+.acts { display: flex; gap: 5px; justify-content: flex-end; white-space: nowrap; }
+.acts button { padding: 3px 7px; font-size: 11.5px; white-space: nowrap; flex: none; box-shadow: 2px 2px 0 0 rgba(0,0,0,.4); }
+.share { min-width: 120px; }
+.share .num { font-size: 11.5px; }
+.empty { padding: 40px 20px; text-align: center; color: var(--ink-3); }
+.empty .big { font-size: 13px; color: var(--ink-2); margin-bottom: 6px; }
+
+/* ── 日志 ─────────────────────────────────────────────────────────── */
+#logBox {
+  max-height: 440px; overflow: auto; margin: 0; padding: 14px 16px;
+  font: 11.5px/1.75 var(--mono); white-space: pre-wrap; word-break: break-all; color: var(--ink-2);
+  background: var(--bg);
+  background-image: repeating-linear-gradient(0deg, var(--grid) 0 1px, transparent 1px 4px);
+}
+#logBox .ln { display: block; }
+#logBox .ln.e { color: var(--bad); }
+#logBox .ln.w { color: var(--warn); }
+
+/* ── 用量统计 ─────────────────────────────────────────────────────── */
+.hero { border: 2px solid var(--line); background: var(--surface); box-shadow: var(--shadow); margin-bottom: 18px; }
+.hero .top { display: flex; align-items: flex-end; gap: 30px; padding: 17px 19px 15px; flex-wrap: wrap; }
+.hero .big { display: flex; align-items: baseline; gap: 7px; }
+.hero .big b { font: 700 40px/1 var(--mono); font-variant-numeric: tabular-nums; letter-spacing: -.02em; color: var(--accent); }
+.hero .big i { font: 500 12px/1 var(--mono); font-style: normal; color: var(--ink-3); letter-spacing: .12em; }
+.hero .big .lb { font-size: 10.5px; color: var(--ink-3); letter-spacing: .1em; align-self: flex-end; padding-bottom: 3px; }
+.hero .side { display: flex; gap: 26px; flex-wrap: wrap; margin-left: auto; }
+@media (max-width: 900px) { .hero .side { margin-left: 0; } }
+.hero .side .v { font: 700 15px/1.15 var(--mono); font-variant-numeric: tabular-nums; }
+.hero .side .k { font-size: 10.5px; color: var(--ink-3); letter-spacing: .08em; margin-top: 5px; }
+.hero .foot { padding: 9px 19px; border-top: 1px solid var(--line-soft); background: var(--surface-2); font-size: 11.5px; color: var(--ink-3); }
+.rngrow { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+.rngrow .note { color: var(--ink-3); font-size: 11.5px; }
+
+.chart { padding: 16px 16px 12px; }
+.plot, .strip, .scale { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 3px; }
+.plot { height: 196px; border-bottom: 2px solid var(--line); }
+.strip { height: 24px; margin-top: 3px; }
+.scale { margin-top: 6px; }
+.scale span {
+  font: 500 9.5px/1 var(--mono); color: var(--ink-3); text-align: center;
+  white-space: nowrap; overflow: hidden; letter-spacing: .04em;
+}
+.col, .col-r { height: 100%; display: flex; align-items: flex-end; }
+.col { cursor: crosshair; outline-offset: 2px; }
+.col .fill {
+  width: 100%; max-width: 46px; margin: 0 auto; height: var(--h);
+  background-image: repeating-linear-gradient(0deg, var(--accent) 0 3px, transparent 3px 5px);
+  transform-origin: bottom;
+}
+.col.zero .fill { height: 2px; background-image: none; background: var(--line); }
+.col:hover .fill, .col.on .fill { background-color: var(--accent-soft); }
+.col.on .fill { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent); }
+.col.peak .fill { position: relative; }
+.col.peak .fill::after {
+  content: ""; position: absolute; left: -2px; right: -2px; top: -3px; height: 2px; background: var(--accent);
+}
+.strip .r { width: 100%; max-width: 46px; margin: 0 auto; height: var(--r); background: var(--ink-3); opacity: .72; min-height: 2px; }
+.strip .r.zero { background: var(--line); opacity: 1; height: 1px; }
+.chart .legend {
+  display: flex; align-items: center; gap: 16px; margin-top: 10px;
+  font-size: 10.5px; color: var(--ink-3); letter-spacing: .06em;
+}
+.chart .legend i { display: inline-block; width: 10px; height: 8px; margin-right: 5px; vertical-align: -1px; }
+.chart .legend .lg-tok i { background-image: repeating-linear-gradient(0deg, var(--accent) 0 3px, transparent 3px 5px); }
+.chart .legend .lg-req i { background: var(--ink-3); opacity: .72; }
+.readout { font: 700 11.5px/1.3 var(--mono); color: var(--ink-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.readout b { color: var(--accent); }
+.readout .bad { color: var(--bad); }
+
+.duo { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: start; }
+.duo > .box { margin-bottom: 0; }
+@media (max-width: 1000px) { .duo { grid-template-columns: 1fr; } }
+.duo .acc { min-width: 0; }
+.duo .acc th, .duo .acc td { padding: 8px 9px; }
+.duo .who { min-width: 0; }
+
+/* ── 配置表单 ─────────────────────────────────────────────────────── */
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 20px; }
+.grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0 16px; }
+@media (max-width: 860px) { .grid2, .grid3 { grid-template-columns: 1fr; } }
+fieldset { border: none; margin-bottom: 6px; }
+legend { font-size: 11.5px; color: var(--ink-3); font-weight: 700; padding-bottom: 10px; letter-spacing: .06em; }
+.hr { height: 2px; background: var(--line-soft); margin: 4px 0 16px; }
+.switch { display: flex; align-items: center; justify-content: space-between; padding: 9px 0; }
+.switch .lb { font-size: 12.5px; }
+.savebar {
+  display: flex; align-items: center; gap: 12px; padding: 12px 16px;
+  border: 2px solid var(--line); background: var(--surface-2);
+  position: sticky; bottom: 0; box-shadow: var(--shadow);
+}
+.savebar .grow { flex: 1; }
+.restart-note { color: var(--warn); font-size: 12px; }
+
+/* ── 弹层 ─────────────────────────────────────────────────────────── */
+.veil {
+  position: fixed; inset: 0; display: none; z-index: var(--z-veil);
+  background-color: rgba(4,7,12,.74);
+  background-image: repeating-linear-gradient(45deg, rgba(0,0,0,.35) 0 2px, transparent 2px 4px);
+}
+.veil.on { display: flex; align-items: center; justify-content: center; padding: 20px; }
+.dlg {
+  background: var(--surface); border: 2px solid var(--accent);
+  width: 560px; max-width: 100%; max-height: 86vh; display: flex; flex-direction: column;
+  box-shadow: var(--shadow-lg);
+}
+.dlg header { padding: 15px 18px 12px; border-bottom: 2px solid var(--line); background: var(--surface-2); }
+.dlg header h3 { font-size: 13.5px; font-weight: 700; letter-spacing: .06em; display: flex; align-items: center; gap: 8px; }
+.dlg header h3::before {
+  content: ""; width: 8px; height: 8px; flex: none; background: var(--accent);
+  clip-path: polygon(0 0, 100% 0, 100% 55%, 55% 55%, 55% 100%, 0 100%);
+}
+.dlg header .hint { color: var(--ink-3); font-size: 11.5px; margin-top: 5px; }
+.dlg .body { padding: 16px 18px; overflow: auto; }
+.dlg footer { padding: 12px 18px; border-top: 2px solid var(--line); display: flex; gap: 9px; background: var(--surface-2); }
+.dlg footer .grow { flex: 1; }
+.url {
+  background: var(--bg); border: 2px solid var(--line);
+  padding: 11px 12px; font: 11.5px var(--mono); word-break: break-all; color: var(--accent);
+  margin: 8px 0 12px; user-select: all; box-shadow: inset 2px 2px 0 0 var(--inset);
+}
+.state { font-size: 12.5px; color: var(--ink-2); display: flex; align-items: center; gap: 8px; }
+.state.ok { color: var(--ok); } .state.err { color: var(--bad); }
+.dots::after { content: "▊"; color: var(--accent); margin-left: 4px; animation: blink 1s steps(2) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+.realm-row { display: flex; align-items: center; gap: 14px; padding: 4px 0 10px; }
+.realm-opt { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink-2); cursor: pointer; white-space: nowrap; }
+.realm-opt input { accent-color: var(--accent); margin: 0; box-shadow: none; }
+
+/* ── Toast ───────────────────────────────────────────────────────── */
+#toasts { position: fixed; right: 20px; bottom: 20px; z-index: var(--z-toast); display: flex; flex-direction: column; gap: 8px; align-items: flex-end; }
+.tst {
+  background: var(--raise); border: 2px solid var(--line); border-left: 4px solid var(--ink-3);
+  padding: 10px 14px; font-size: 12.5px; box-shadow: var(--shadow); max-width: 380px;
+}
+.tst.ok { border-left-color: var(--ok); } .tst.err { border-left-color: var(--bad); }
+
+@media (max-width: 760px) {
+  .shell { grid-template-columns: 1fr; }
+  .nav { position: static; height: auto; flex-direction: row; align-items: center; overflow-x: auto; border-right: none; border-bottom: 2px solid var(--line); }
+  .nav ul { display: flex; padding: 8px; } .nav .sig { border: none; }
+  .stat { border-right: none; border-bottom: 1px solid var(--line-soft); }
+}
+</style>
+</head>
+<body>
+<div class="shell">
+  <nav class="nav">
+    <div class="brand">
+      <div class="name">
+        <svg class="logo" viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="2" width="10" height="1"/><rect x="2" y="3" width="2" height="1"/><rect x="12" y="3" width="2" height="1"/><rect x="2" y="4" width="12" height="4"/><rect x="5" y="8" width="2" height="2"/><rect x="9" y="8" width="2" height="2"/><rect x="4" y="10" width="3" height="1"/><rect x="9" y="10" width="3" height="1"/><rect x="3" y="11" width="10" height="1"/><rect x="11" y="12" width="3" height="2"/></svg>
+        qoder-free
+      </div>
+      <div class="sub" id="navSub">控制台</div>
+    </div>
+    <ul>
+      <li><a href="#accounts" data-view="accounts" class="on">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="5.5" r="2.6"/><path d="M2.8 13.5c.6-2.6 2.7-4 5.2-4s4.6 1.4 5.2 4"/></svg>
+        账号池</a></li>
+      <li><a href="#stats" data-view="stats">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2 13.5h12"/><path d="M4.2 13.5V8.6M8 13.5V4.2M11.8 13.5V6.8"/></svg>
+        用量统计</a></li>
+      <li><a href="#models" data-view="models">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M8 1.8 14 5v6L8 14.2 2 11V5z"/><path d="M2 5l6 3.2L14 5M8 8.2v6"/></svg>
+        模型</a></li>
+      <li><a href="#config" data-view="config">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="2.2"/><path d="M8 1.6v1.9M8 12.5v1.9M1.6 8h1.9M12.5 8h1.9M3.5 3.5l1.3 1.3M11.2 11.2l1.3 1.3M12.5 3.5l-1.3 1.3M4.8 11.2l-1.3 1.3"/></svg>
+        配置</a></li>
+      <li><a href="#logs" data-view="logs">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2.5 3.5h11M2.5 8h11M2.5 12.5h7"/></svg>
+        运行日志</a></li>
+    </ul>
+    <div class="sig">
+      <div class="row"><span class="pulse" id="navPulse"></span><span id="navState">连接中</span></div>
+      <div class="row" style="margin-top:5px"><span id="navVer">v-</span> · 运行 <span id="navUp">-</span></div>
+      <div class="row credit">OpenAI: /v1 · 面板本机开放</div>
+    </div>
+  </nav>
+
+  <div class="main">
+    <div class="topbar">
+      <h2 id="ttl">账号池</h2>
+      <span class="sep">/</span>
+      <span class="meta" id="subMeta">-</span>
+      <div class="grow"></div>
+      <button class="icon ghost" id="btnTheme" title="切换明暗（跟随系统 → 浅色 → 深色）" aria-label="切换主题">
+        <svg id="icoTheme" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M13.2 9.6A5.6 5.6 0 0 1 6.4 2.8a5.6 5.6 0 1 0 6.8 6.8z"/></svg>
+      </button>
+      <button id="btnRefresh">刷新</button>
+      <button class="primary" id="btnAdd">添加账号</button>
+    </div>
+
+    <!-- 账号池 -->
+    <section class="view" id="view-accounts">
+      <div class="stats">
+        <div class="stat"><div class="v" id="sTotal">-</div><div class="k">账号总数</div></div>
+        <div class="stat good"><div class="v" id="sHealthy">-</div><div class="k">可用</div></div>
+        <div class="stat warn"><div class="v" id="sCooling">-</div><div class="k">冷却中</div></div>
+        <div class="stat bad"><div class="v" id="sDisabled">-</div><div class="k">已禁用</div></div>
+        <div class="stat"><div class="v" id="sCredits">-</div><div class="k">积分剩余 / 总额</div></div>
+        <div class="stat"><div class="v" id="sSticky">-</div><div class="k">粘性会话</div></div>
+      </div>
+
+      <div class="box">
+        <header>
+          <h3>账号池 <span class="hint">同一会话优先复用账号；cn: / global: 前缀强制区域</span></h3>
+          <span class="grow"></span>
+          <span class="note" id="accNote"></span>
+        </header>
+        <div class="tbl-wrap">
+        <table class="acc">
+          <thead><tr>
+            <th class="mark" aria-hidden="true"></th>
+            <th>账号</th><th>状态</th><th>额度</th>
+            <th>成功 / 失败</th><th>在途</th><th>最近成功</th><th class="c-acts"></th>
+          </tr></thead>
+          <tbody id="accBody"></tbody>
+        </table>
+        </div>
+      </div>
+
+      <div class="box">
+        <header><h3>OpenAI 接入</h3></header>
+        <div class="pad">
+          <div class="state">Base URL <b id="apiBase" class="num" style="margin-left:6px">-</b></div>
+          <div class="hint" style="font-size:11px;color:var(--ink-3);margin-top:6px">
+            API Key 使用 config.json 中的 api_key（/v1 接口鉴权用，面板本机开放无需填写）。模型列表见「模型」页。
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 用量统计 -->
+    <section class="view" id="view-stats" hidden>
+      <div class="hero">
+        <div class="top">
+          <div class="big"><b id="ltTotal">-</b><i>tok</i><span class="lb">自统计启用起</span></div>
+          <div class="side">
+            <div><div class="v" id="ltPrompt">-</div><div class="k">输入 TOKEN</div></div>
+            <div><div class="v" id="ltCompletion">-</div><div class="k">输出 TOKEN</div></div>
+            <div><div class="v" id="ltRequests">-</div><div class="k">请求次数</div></div>
+            <div><div class="v" id="ltAccounts">-</div><div class="k">活跃账号</div></div>
+          </div>
+        </div>
+        <div class="foot">自统计功能启用起累计，不随下方保留窗口缩减；区间口径只作用于以下观测</div>
+      </div>
+
+      <div class="rngrow">
+        <span class="chips" id="rngChips">
+          <button class="xs chip" data-rng="today">今日</button>
+          <button class="xs chip" data-rng="7d">近 7 天</button>
+          <button class="xs chip on" data-rng="30d">近 30 天</button>
+        </span>
+        <span class="note" id="rngNote"></span>
+      </div>
+
+      <div class="stats">
+        <div class="stat"><div class="v" id="stTotal">-</div><div class="k">区间 TOKEN</div></div>
+        <div class="stat"><div class="v" id="stPrompt">-</div><div class="k">输入 TOKEN</div></div>
+        <div class="stat"><div class="v" id="stCompletion">-</div><div class="k">输出 TOKEN</div></div>
+        <div class="stat"><div class="v" id="stRequests">-</div><div class="k">请求次数</div></div>
+        <div class="stat bad"><div class="v" id="stFailed">-</div><div class="k">失败</div></div>
+        <div class="stat"><div class="v" id="stCredits">-</div><div class="k">消耗积分</div></div>
+      </div>
+
+      <div class="box">
+        <header>
+          <h3>消费节律</h3>
+          <span class="grow"></span>
+          <span class="readout" id="chartReadout">—</span>
+        </header>
+        <div class="chart">
+          <div class="plot" id="chartPlot"></div>
+          <div class="strip" id="chartStrip"></div>
+          <div class="scale" id="chartScale"></div>
+          <div class="legend">
+            <span class="lg-tok"><i></i>token 用量</span>
+            <span class="lg-req"><i></i>请求次数</span>
+            <span class="grow" style="flex:1"></span>
+            <span id="chartUnit">按自然日</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="duo">
+        <div class="box">
+          <header><h3>模型分布</h3><span class="grow"></span><span class="note" id="mdStatNote"></span></header>
+          <div class="tbl-wrap">
+            <table class="acc md">
+              <thead><tr><th class="mark" aria-hidden="true"></th><th>模型</th><th>TOKEN</th><th>占比</th><th>请求</th><th>输入 / 输出</th></tr></thead>
+              <tbody id="mdStatBody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="box">
+          <header><h3>账号用量</h3><span class="grow"></span><span class="note" id="acStatNote"></span></header>
+          <div class="tbl-wrap">
+            <table class="acc md">
+              <thead><tr><th class="mark" aria-hidden="true"></th><th>账号</th><th>TOKEN</th><th>占比</th><th>请求</th><th>失败</th></tr></thead>
+              <tbody id="acStatBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 模型 -->
+    <section class="view" id="view-models" hidden>
+      <div class="box">
+        <header>
+          <h3>模型目录</h3>
+          <span class="grow"></span>
+          <span class="note" id="mdNote">来自就绪账号的实时 catalog</span>
+          <button class="xs" id="btnModels">重新获取</button>
+        </header>
+        <div class="tbl-wrap">
+        <table class="acc md">
+          <thead><tr><th class="mark" aria-hidden="true"></th><th>模型 ID</th><th>显示名</th><th>区域</th><th>类型</th><th>计费</th></tr></thead>
+          <tbody id="mdBody"></tbody>
+        </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- 配置 -->
+    <section class="view" id="view-config" hidden>
+      <form id="cfgForm">
+        <div class="box">
+          <header><h3>服务</h3><span class="grow"></span><span class="note" id="cfgPath"></span></header>
+          <div class="pad">
+            <div class="grid2">
+              <label class="fld"><span class="lb">监听地址</span>
+                <input name="listen" disabled>
+                <span class="hint">修改需编辑 config.json 并重启进程</span></label>
+              <label class="fld"><span class="lb">API 密钥（/v1 接口）</span>
+                <span style="display:flex;gap:6px;align-items:center">
+                  <input name="api_key" disabled style="flex:1;min-width:0">
+                  <button type="button" class="xs" id="btnCopyKey" style="flex:0 0 auto">复制</button>
+                </span>
+                <span class="hint">面板本机开放无需鉴权；此密钥供 OpenAI 客户端使用</span></label>
+            </div>
+          </div>
+        </div>
+
+        <div class="box">
+          <header><h3>账号池与流量治理</h3></header>
+          <div class="pad">
+            <div class="grid3">
+              <label class="fld"><span class="lb">单账号最大在途</span>
+                <input name="max_in_flight" type="number" min="1" placeholder="4"></label>
+              <label class="fld"><span class="lb">单请求轮换账号数</span>
+                <input name="max_retry_accounts" type="number" min="1" placeholder="3"></label>
+              <label class="fld"><span class="lb">限流冷却基数（秒）</span>
+                <input name="cooldown_soft_seconds" type="number" min="1" placeholder="600"></label>
+            </div>
+            <div class="grid2">
+              <div class="switch"><span class="lb">会话粘性路由</span>
+                <input type="checkbox" name="session_sticky"></div>
+              <div class="switch"><span class="lb">按天用量统计</span>
+                <input type="checkbox" name="stats_enabled"></div>
+            </div>
+            <label class="fld" style="max-width:280px"><span class="lb">统计保留天数</span>
+              <input name="stats_keep_days" type="number" min="1" placeholder="30"></label>
+          </div>
+        </div>
+
+        <div class="box">
+          <header><h3>上游</h3></header>
+          <div class="pad">
+            <label class="fld" style="max-width:420px"><span class="lb">出站代理</span>
+              <input name="proxy_url" placeholder="http://127.0.0.1:7890（留空直连）">
+              <span class="hint">传给每账号 worker；立即对新建连接生效</span></label>
+          </div>
+        </div>
+
+        <div class="savebar">
+          <span class="grow"></span>
+          <span class="restart-note" id="cfgNote"></span>
+          <button type="button" id="btnCfgReload">放弃修改</button>
+          <button type="submit" class="primary" id="btnCfgSave">保存配置</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- 日志 -->
+    <section class="view" id="view-logs" hidden>
+      <div class="box">
+        <header>
+          <h3>运行日志</h3>
+          <span class="grow"></span>
+          <span class="chips" id="logChips">
+            <button class="xs chip on" data-ch="all">全部</button>
+            <button class="xs chip" data-ch="chat">对话</button>
+            <button class="xs chip" data-ch="worker">worker</button>
+            <button class="xs chip" data-ch="sys">系统</button>
+          </span>
+          <span class="note" id="logNote">最近 800 行</span>
+          <button class="xs" id="btnLogPin">自动滚动：开</button>
+        </header>
+        <pre id="logBox"></pre>
+      </div>
+    </section>
+  </div>
+</div>
+
+<!-- 添加账号 / 登录 -->
+<div class="veil" id="addVeil">
+  <div class="dlg">
+    <header>
+      <h3 id="addTitle">添加账号</h3>
+      <div class="hint" id="addHint">浏览器完成 Qoder 设备授权，凭证由 worker 写入账号数据目录，无需重启。</div>
+    </header>
+    <div class="body">
+      <div id="addPick">
+        <div class="realm-row">
+          <span class="hint" style="font-size:12px">版本：</span>
+          <label class="realm-opt"><input type="radio" name="addRealm" value="cn" checked> 国内版（cn）</label>
+          <label class="realm-opt"><input type="radio" name="addRealm" value="global"> 国际版（global）</label>
+        </div>
+        <label class="fld" style="margin-top:8px"><span class="lb">名称（可选）</span>
+          <input id="addName" placeholder="默认按区域命名"></label>
+        <div class="hint" style="font-size:11px;color:var(--ink-3)">国际版需先安装 @qoder-ai/qodercli 并在 config.json 配置 qoder_cli_js。</div>
+      </div>
+      <div id="addLoad" class="state" hidden><span class="dots">正在获取授权链接</span></div>
+      <div id="addReady" hidden>
+        <div class="state">在浏览器打开以下链接并登录：</div>
+        <div class="url" id="addUrl"></div>
+        <div class="state" id="addPoll"><span class="dots">等待授权完成，自动检测中</span></div>
+      </div>
+      <div id="addDone" class="state ok" hidden></div>
+      <div id="addErr" class="state err" hidden></div>
+    </div>
+    <footer>
+      <span class="grow"></span>
+      <button id="btnStartLogin" class="primary">获取授权链接</button>
+      <button id="btnCopyUrl" hidden>复制链接</button>
+      <button id="btnOpenUrl" class="primary" hidden>在浏览器打开</button>
+      <button id="btnCloseAdd">关闭</button>
+    </footer>
+  </div>
+</div>
+
+<!-- 额度 -->
+<div class="veil" id="quotaVeil">
+  <div class="dlg" style="width:480px">
+    <header>
+      <h3>额度 <span class="hint" id="quotaWho"></span></h3>
+      <div class="hint">来自 worker 实时查询；剩余 = 可用桶之和（基础 + 加量包 + 组织包）。</div>
+    </header>
+    <div class="body">
+      <div class="state" id="quotaState"><span class="dots">查询中</span></div>
+      <div id="quotaBody" hidden></div>
+    </div>
+    <footer>
+      <span class="grow"></span>
+      <button id="btnQuotaRefresh">强制刷新</button>
+      <button id="btnCloseQuota">关闭</button>
+    </footer>
+  </div>
+</div>
+
+<div id="toasts"></div>
+
+<script src="app.js"></script>
+</body>
+</html>

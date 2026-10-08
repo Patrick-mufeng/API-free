@@ -1,0 +1,23 @@
+{
+  "listen": "127.0.0.1:8210",
+  "api_key": "",
+  "data_dir": "./data",
+  "worker_base_port": 33100,
+  "node_binary": "node",
+  "worker_daemon": "worker/src/daemon.mjs",
+  "qoder_cli_js": "",
+  "qoder_cn_cli_js": "",
+  "plain_template": "worker/last-plain.sample.json",
+  "proxy_url": "",
+  "max_retry_accounts": 3,
+  "max_in_flight": 4,
+  "cooldown_soft_seconds": 600,
+  "cooldown_soft_max_seconds": 7200,
+  "breaker_threshold": 3,
+  "breaker_cooldown_seconds": 1800,
+  "session_sticky": true,
+  "session_ttl_seconds": 1800,
+  "stats_enabled": true,
+  "stats_keep_days": 30,
+  "request_body_cap_mb": 32
+}

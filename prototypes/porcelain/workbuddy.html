@@ -1,0 +1,572 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WorkBuddy-free · API-free</title>
+<link rel="stylesheet" href="theme.css">
+<style>
+  .stat6{display:grid;grid-template-columns:repeat(6,1fr);gap:26px;margin-bottom:34px}
+  .stat6 .kpi .v{font-size:24px}
+  .duo{display:grid;grid-template-columns:1.3fr 1fr;gap:44px}
+  .pill{display:inline-block;font-size:10.5px;padding:1px 7px;border-radius:6px;margin-right:4px;font-family:var(--mono)}
+  .pill.cy{background:var(--accent-soft);color:var(--muted)}
+  .pill.am{background:var(--warn-soft);color:var(--warn)}
+  .pill.gr{background:var(--ok-soft);color:var(--ok)}
+  .cell{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-family:var(--mono)}
+  .cell .s{font-size:11px}
+  .cell.done{color:var(--ok)} .cell.avail{color:var(--warn)} .cell.part{color:var(--warn)} .cell.todo{color:var(--faint)} .cell.skip{color:var(--faint)}
+  .qcell{display:grid;grid-template-columns:118px 1fr 52px 84px minmax(120px,240px);gap:10px;padding:9px 2px;border-top:1px solid var(--line-soft);font-size:12.5px;align-items:center}
+  .qhead{border-top:1px solid var(--line);color:var(--faint);font-size:10.5px;letter-spacing:.03em;padding:7px 2px}
+  .sq{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:0 34px}
+  @media (max-width:900px){.stat6{grid-template-columns:repeat(3,1fr)}.duo,.grid3{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="pagehead">
+    <svg width="34" height="34" viewBox="0 0 32 32" style="border:1px solid var(--line);border-radius:11px;background:#fff"><text x="16" y="21.5" text-anchor="middle" font-size="14" font-weight="700" fill="#1c1c1a">W</text></svg>
+    <div>
+      <h1 style="margin:0;font-size:19px;font-weight:650">WorkBuddy-free</h1>
+      <div class="sub">Go · 端口 7863 · 常驻进程 · 崩溃自动拉起已启用 · Redis 本地内存 · 运行 6 时 12 分</div>
+    </div>
+    <span class="st run" id="svcBadge"><i></i>运行中</span>
+    <span style="flex:1"></span>
+    <button class="btn" id="refreshBtn" title="刷新全部账号余额">刷新</button>
+    <button class="btn" id="restartBtn">重启</button>
+    <button class="sw" role="switch" aria-checked="true" aria-label="服务开关" id="svcSwitch"></button>
+    <button class="btn pri" id="addBtn">添加账号</button>
+  </div>
+  <div class="confirm" id="svcConfirm" style="display:none;margin:-16px 0 26px">
+    <span>停止后该服务将不可用，进行中的请求会失败。</span><span style="flex:1"></span>
+    <button class="btn ghost" id="cfCancel">取消</button>
+    <button class="btn dgr" id="cfOk">确认停止</button>
+  </div>
+
+  <div class="tabs" id="svcTabs">
+    <button class="on" data-t="acct">账号池</button>
+    <button data-t="stats">用量统计</button>
+    <button data-t="tasks">任务中心</button>
+    <button data-t="models">模型与档位</button>
+    <button data-t="config">配置</button>
+    <button data-t="logs">运行日志</button>
+  </div>
+
+  <!-- ================= 账号池 ================= -->
+  <div class="tabpanel on" id="tp-acct">
+    <div class="stat6">
+      <div class="kpi"><h3>账号总数</h3><div class="v">4</div></div>
+      <div class="kpi"><h3>可用</h3><div class="v" style="color:var(--ok)">2</div></div>
+      <div class="kpi"><h3>冷却中</h3><div class="v" style="color:var(--warn)">1</div></div>
+      <div class="kpi"><h3>已禁用</h3><div class="v" style="color:var(--bad)">1</div></div>
+      <div class="kpi"><h3>积分剩余 / 总额</h3><div class="v" style="font-size:19px">6,843 / 20,130</div></div>
+      <div class="kpi"><h3>粘性会话</h3><div class="v">2</div></div>
+    </div>
+
+    <div class="sect">
+      <div class="sect-head">
+        <h3>批量操作</h3>
+        <span class="sp"></span><span class="sub" id="accMeta">1 个账号在途占满</span>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px">
+        <button class="op" data-batch="全部签到已开始，结果见日志">全部签到</button>
+        <button class="op" data-batch="旅行巡检已开始（含领养链路），结果见日志">旅行巡检</button>
+        <button class="op" data-batch="活跃上报已开始，结果见日志">活跃上报</button>
+        <button class="op" data-batch="全部保活已开始，结果见日志">全部保活</button>
+      </div>
+      <div class="tbox"><table>
+        <thead><tr><th style="width:6px"></th><th style="width:180px">账号</th><th style="width:150px">状态</th><th style="width:150px">积分</th><th style="width:84px">成功 / 失败</th><th style="width:52px">在途</th><th>用量</th><th style="width:92px">最近成功</th><th style="width:200px"></th></tr></thead>
+        <tbody id="acctBody"></tbody>
+      </table></div>
+    </div>
+  </div>
+
+  <!-- ================= 用量统计 ================= -->
+  <div class="tabpanel" id="tp-stats">
+    <div class="sect">
+      <div style="display:flex;align-items:flex-end;gap:34px;flex-wrap:wrap;padding:6px 0 14px;border-bottom:1px solid var(--line);margin-bottom:16px">
+        <div><div style="font-size:34px;font-weight:700;letter-spacing:-.02em" class="tok">2,481.2万 <span style="font-size:14px;color:var(--muted);font-weight:600">tok</span></div>
+             <div class="muted" style="font-size:12px;margin-top:2px">自统计启用起</div></div>
+        <div style="margin-left:auto;display:flex;gap:30px" class="tok">
+          <div><div style="font-size:17px;font-weight:650">1,538.3万</div><div class="faint" style="font-size:10.5px">输入 TOKEN</div></div>
+          <div><div style="font-size:17px;font-weight:650">942.9万</div><div class="faint" style="font-size:10.5px">输出 TOKEN</div></div>
+          <div><div style="font-size:17px;font-weight:650">6,512</div><div class="faint" style="font-size:10.5px">请求次数</div></div>
+          <div><div style="font-size:17px;font-weight:650">4</div><div class="faint" style="font-size:10.5px">活跃账号</div></div>
+        </div>
+      </div>
+      <p class="faint" style="font-size:11.5px;margin:0 0 22px">自 09-07 起累计（4 个账号），不随统计保留窗口缩减</p>
+    </div>
+
+    <div class="sect">
+      <div class="sect-head">
+        <div class="seg" id="rngChips"><button data-rng="today">今日</button><button data-rng="7d">近 7 天</button><button class="on" data-rng="30d">近 30 天</button></div>
+        <span class="sub" id="rngNote">统计自 09-07 起 · 覆盖 30 / 30 天 · 保留 30 天</span>
+      </div>
+      <div class="stat6" style="margin-bottom:26px">
+        <div class="kpi"><h3>区间 TOKEN</h3><div class="v" id="rTok">311.9万</div></div>
+        <div class="kpi"><h3>输入 TOKEN</h3><div class="v" id="rIn">193.4万</div></div>
+        <div class="kpi"><h3>输出 TOKEN</h3><div class="v" id="rOut">118.5万</div></div>
+        <div class="kpi"><h3>请求次数</h3><div class="v" id="rReq">812</div></div>
+        <div class="kpi"><h3>失败 · 成功率</h3><div class="v" style="color:var(--warn)">9 · 98.9%</div></div>
+        <div class="kpi"><h3>平均速率</h3><div class="v">36.4 tok/s</div></div>
+      </div>
+      <div class="sect-head">
+        <h3>消费节律</h3>
+        <span class="sub">token 用量</span><span class="sub" style="color:rgba(28,28,26,.35)">▉ 请求次数</span>
+        <span class="sp"></span><span class="sub" id="chartUnit">按自然日（CST） · 峰值 15.8万 @ 10-04</span>
+      </div>
+      <div class="chartbox" style="height:220px"><svg id="wbChart" viewBox="0 0 1000 220" preserveAspectRatio="none"></svg><div class="chart-tip" id="wbTip"></div></div>
+    </div>
+
+    <div class="duo">
+      <div class="sect">
+        <div class="sect-head"><h3>模型分布</h3><span class="sub">4 个模型</span></div>
+        <div class="tbox"><table>
+          <thead><tr><th>模型</th><th class="num-r">TOKEN</th><th style="width:120px">占比</th><th class="num-r">请求</th><th class="num-r">输入 / 输出</th></tr></thead>
+          <tbody id="wModBody"></tbody>
+        </table></div>
+      </div>
+      <div class="sect">
+        <div class="sect-head"><h3>账号用量</h3><span class="sub">4 个账号</span></div>
+        <div class="tbox"><table>
+          <thead><tr><th>账号</th><th class="num-r">TOKEN</th><th style="width:110px">占比</th><th class="num-r">请求</th><th class="num-r">失败</th></tr></thead>
+          <tbody id="wAcctBody"></tbody>
+        </table></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 任务中心 ================= -->
+  <div class="tabpanel" id="tp-tasks">
+    <div class="sect">
+      <div class="sect-head">
+        <h3>开学季</h3><span class="sub">09-13 ~ 09-24 · 每日重置</span>
+        <span class="sp"></span><span class="sub" id="schoolSummary">2/4 个账号今日全部完成</span>
+        <button class="btn xs" id="schoolRefresh">刷新</button>
+        <button class="btn xs pri" id="schoolRun">全部账号执行闭环</button>
+      </div>
+      <div class="tbox"><table>
+        <thead><tr><th>账号</th><th>分享</th><th>桌面</th><th>对话×3</th><th>专家</th><th>认证</th><th class="num-r">剩余抽奖</th></tr></thead>
+        <tbody id="schoolBody"></tbody>
+      </table></div>
+    </div>
+
+    <div class="sect">
+      <div class="sect-head">
+        <h3>成长任务队列</h3><span class="sub" id="qcSummary">7 项</span>
+        <span class="sp"></span>
+        <label class="muted" style="font-size:12px">并发
+          <select style="min-width:0"><option>1</option><option>2</option><option selected>3</option></select></label>
+        <button class="btn xs" id="scanBtn">扫描待办</button>
+        <button class="btn xs pri" id="runQueueBtn">执行全部待办</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+        <div class="bar slim" style="max-width:320px"><i style="width:43%"></i></div>
+        <span class="muted tok" style="font-size:12px">执行中 3 / 7</span>
+      </div>
+      <div id="queueBox">
+        <div class="qhead" style="display:grid;grid-template-columns:118px 1fr 52px 84px minmax(120px,240px)"><span>任务</span><span>名称</span><span>进度</span><span>状态</span><span>消息</span></div>
+        <div class="qhead" style="border-top:0;padding-top:14px;color:var(--text);font-weight:650;font-size:12.5px">lin_yizhou · 3 项待办</div>
+        <div class="qcell"><span class="m muted">chat_5</span><span>对话活跃 ×5 <span class="chip">开学季</span></span><span class="tok">2/5</span><span><span class="sq" style="background:var(--accent-soft);border:1px solid var(--muted)"></span>执行中</span><span class="muted" style="font-size:12px">补报对话事件（自动补足差额）</span></div>
+        <div class="qcell"><span class="m muted">first_buddy</span><span>领取第一只 Buddy</span><span class="tok">—</span><span><span class="sq" style="background:var(--ok)"></span>完成</span><span class="muted" style="font-size:12px">奖励已到账 +1 Buddy</span></div>
+        <div class="qcell"><span class="m muted">Model_chat_GLM5.2</span><span>glm-5.2 真实对话</span><span class="tok">—</span><span><span class="sq" style="border:1px solid var(--line)"></span>排队</span><span class="muted" style="font-size:12px">等待账号空闲（账号内串行）</span></div>
+        <div class="qhead" style="border-top:1px solid var(--line);padding-top:14px;color:var(--text);font-weight:650;font-size:12.5px">mango_dev · 2 项待办</div>
+        <div class="qcell"><span class="m muted">create_canvas</span><span>设计创意画布创建</span><span class="tok">—</span><span><span class="sq" style="background:var(--ok)"></span>完成</span><span class="muted" style="font-size:12px">+300 分，奖励已自动到账</span></div>
+        <div class="qcell"><span class="m muted">template_5</span><span>使用模板创建任务 ×5</span><span class="tok">3/5</span><span><span class="sq" style="background:var(--bad)"></span>失败</span><span class="muted" style="font-size:12px">上游超时，可重试</span></div>
+        <div class="qhead" style="border-top:1px solid var(--line);padding-top:14px;color:var(--text);font-weight:650;font-size:12.5px">chen.nor · 2 项待办</div>
+        <div class="qcell"><span class="m muted">Library_read</span><span>读资料库介绍</span><span class="tok">—</span><span><span class="sq" style="border:1px solid var(--line)"></span>待执行</span><span class="muted" style="font-size:12px">—</span></div>
+        <div class="qcell"><span class="m muted">skill_1</span><span>技能加载事件</span><span class="tok">—</span><span><span class="sq" style="background:var(--off-soft);border:1px solid var(--line)"></span>跳过</span><span class="muted" style="font-size:12px">账号处于限流冷却，已顺延</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 模型与档位 ================= -->
+  <div class="tabpanel" id="tp-models">
+    <div class="sect">
+      <div class="sect-head">
+        <h3>模型能力</h3><span class="sub">4 个模型 · 已刷新降级缓存</span>
+        <span class="sp"></span><button class="btn xs" id="mdRefresh">重新获取</button>
+      </div>
+      <div class="tbox"><table>
+        <thead><tr><th style="width:6px"></th><th style="width:190px">模型</th><th style="width:80px">积分倍率</th><th style="width:96px">默认档</th><th>支持的思考档位</th><th class="num-r" style="width:96px">上下文长度</th><th class="num-r" style="width:88px">最大输出</th></tr></thead>
+        <tbody>
+          <tr><td><span class="mark"></span></td><td><b>glm-5.2</b><div class="faint" style="font-size:11px">GLM 5.2</div></td>
+              <td>1×</td><td>—</td>
+              <td><span class="st warn"><i></i>think</span> <span class="st warn"><i></i>air</span></td>
+              <td class="num-r">128K</td><td class="num-r">32K</td></tr>
+          <tr><td><span class="mark"></span></td><td><b>claude-sonnet-4-5</b><div class="faint" style="font-size:11px">Claude Sonnet 4.5</div></td>
+              <td>2×</td><td><span class="st ok"><i></i>high</span></td>
+              <td><span class="st warn"><i></i>think</span> <span class="st mute"><i></i>off（可关）</span></td>
+              <td class="num-r">200K</td><td class="num-r">64K</td></tr>
+          <tr><td><span class="mark"></span></td><td><b>gpt-5-codex</b><div class="faint" style="font-size:11px">GPT-5 Codex</div></td>
+              <td>2×</td><td><span class="st ok"><i></i>standard</span></td>
+              <td><span class="st warn"><i></i>standard</span></td>
+              <td class="num-r">128K</td><td class="num-r">32K</td></tr>
+          <tr><td><span class="mark"></span></td><td><b>kimi-k2</b><div class="faint" style="font-size:11px">Kimi K2</div></td>
+              <td>1×</td><td>—</td>
+              <td><span class="st mute"><i></i>不支持思考</span></td>
+              <td class="num-r">128K</td><td class="num-r">8K</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+  </div>
+
+  <!-- ================= 配置 ================= -->
+  <div class="tabpanel" id="tp-config">
+    <div class="sect">
+      <div class="sect-head"><h3>服务</h3><span class="sp"></span><span class="sub">config.json · 保存立即写入</span></div>
+      <div class="tbox"><table><tbody>
+        <tr><td style="width:190px"><b>监听地址</b><div class="muted" style="font-size:11.5px">改动需重启进程</div></td>
+            <td><input type="text" value=":7863" style="width:160px"></td></tr>
+        <tr><td><b>API 密钥</b><div class="muted" style="font-size:11.5px">立即生效（含面板自身）</div></td>
+            <td><input type="password" value="wbk_9f2e77a1c3d04b6e" id="wbKey" style="width:240px">
+                <button class="btn xs" id="keyToggle" style="margin-left:8px">显示</button>
+                <button class="btn xs" data-copy="#wbKey">复制</button></td></tr>
+      </tbody></table></div>
+    </div>
+
+    <div class="sect">
+      <div class="sect-head"><h3>定时任务</h3></div>
+      <div class="tbox"><table><tbody>
+        <tr><td style="width:190px"><b>自动签到</b></td><td><button class="sw" role="switch" aria-checked="true"></button> <input type="text" value="9, 21" style="width:110px;margin-left:12px" class="m"> <span class="muted" style="font-size:11.5px">签到时点（小时，逗号分隔）</span></td></tr>
+        <tr><td><b>Token 保活</b></td><td><button class="sw" role="switch" aria-checked="true"></button> <input type="text" value="22" style="width:110px;margin-left:12px" class="m"> <span class="muted" style="font-size:11.5px">保活时点（小时，逗号分隔）</span></td></tr>
+        <tr><td><b>猫猫旅行</b></td><td><button class="sw" role="switch" aria-checked="true"></button> <input type="text" value="9, 21" style="width:110px;margin-left:12px" class="m"> <span class="muted" style="font-size:11.5px">一趟派出 + 一趟领奖闭环</span></td></tr>
+        <tr><td><b>活跃上报</b></td><td><button class="sw" role="switch" aria-checked="true"></button> <input type="text" value="10" style="width:110px;margin-left:12px" class="m"> <span class="muted" style="font-size:11.5px">点亮连登 + 解锁领养前置</span></td></tr>
+        <tr><td><b>后台刷新余额</b></td><td><button class="sw" role="switch" aria-checked="true"></button> <input type="number" value="5" min="1" style="width:90px;margin-left:12px"> <span class="muted" style="font-size:11.5px">刷新间隔（分钟）</span></td></tr>
+      </tbody></table></div>
+    </div>
+
+    <div class="sect">
+      <div class="sect-head"><h3>账号池与流量治理</h3></div>
+      <div class="grid3" style="border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:16px 0">
+        <div style="padding:8px 0"><b style="font-size:12.5px">单账号最大在途</b><div class="muted" style="font-size:11px">0 = 不限制</div><input type="number" value="3" min="0" style="width:100%;margin-top:6px"></div>
+        <div style="padding:8px 0"><b style="font-size:12.5px">连续失败熔断阈值</b><div class="muted" style="font-size:11px">&nbsp;</div><input type="number" value="3" min="1" style="width:100%;margin-top:6px"></div>
+        <div style="padding:8px 0"><b style="font-size:12.5px">软限流冷却基数</b><div class="muted" style="font-size:11px">&nbsp;</div><input type="text" value="600s" style="width:100%;margin-top:6px"></div>
+        <div style="padding:8px 0"><b style="font-size:12.5px">软冷却退避上限</b><div class="muted" style="font-size:11px">&nbsp;</div><input type="text" value="2h" style="width:100%;margin-top:6px"></div>
+        <div style="padding:8px 0"><b style="font-size:12.5px">熔断基础时长</b><div class="muted" style="font-size:11px">&nbsp;</div><input type="text" value="30m" style="width:100%;margin-top:6px"></div>
+        <div style="padding:8px 0"><b style="font-size:12.5px">熔断退避上限</b><div class="muted" style="font-size:11px">&nbsp;</div><input type="text" value="6h" style="width:100%;margin-top:6px"></div>
+        <div style="padding:8px 0"><b style="font-size:12.5px">闲置补偿 / 小时</b><div class="muted" style="font-size:11px">&nbsp;</div><input type="number" value="0.5" step="0.1" style="width:100%;margin-top:6px"></div>
+        <div style="padding:8px 0"><b style="font-size:12.5px">闲置补偿上限</b><div class="muted" style="font-size:11px">&nbsp;</div><input type="number" value="5" step="0.1" style="width:100%;margin-top:6px"></div>
+        <div style="padding:8px 0"><b style="font-size:12.5px">会话粘性 TTL</b><div class="muted" style="font-size:11px">改动需重启进程</div><input type="text" value="30m" style="width:100%;margin-top:6px"></div>
+      </div>
+    </div>
+
+    <div class="sect">
+      <div class="sect-head"><h3>上游与高级</h3></div>
+      <div class="tbox"><table><tbody>
+        <tr><td style="width:190px"><b>短请求超时</b><div class="muted" style="font-size:11.5px">需重启</div></td><td><input type="number" value="120" min="1" style="width:100px"></td></tr>
+        <tr><td><b>聊天首字节超时</b><div class="muted" style="font-size:11.5px">需重启</div></td><td><input type="number" value="120" min="1" style="width:100px"></td></tr>
+        <tr><td><b>流空闲超时</b><div class="muted" style="font-size:11.5px">需重启</div></td><td><input type="number" value="300" min="1" style="width:100px"></td></tr>
+        <tr><td><b>请求体上限（MB）</b><div class="muted" style="font-size:11.5px">多图会话可调大；需重启</div></td><td><input type="number" value="8" min="1" style="width:100px"></td></tr>
+        <tr><td><b>出站 User-Agent</b><div class="muted" style="font-size:11.5px">影响官网积分记录「使用端」显示；需重启</div></td>
+            <td><input type="text" placeholder="留空 = CLI/2.63.2 CodeBuddy/2.63.2" style="width:300px"></td></tr>
+        <tr><td><b>系统提示词模式</b><div class="muted" style="font-size:11.5px">需重启</div></td>
+            <td><select style="width:380px"><option>custom — 网关自有提示词（避免指纹误报）</option><option>passthrough — 透传客户端原始 system</option></select></td></tr>
+        <tr><td><b>提示词文件路径</b><div class="muted" style="font-size:11.5px">需重启</div></td>
+            <td><input type="text" placeholder="留空 = 内置默认提示词" style="width:300px"></td></tr>
+        <tr><td><b>出站请求指纹脱敏</b></td><td><button class="sw" role="switch" aria-checked="true"></button></td></tr>
+        <tr><td><b>会话粘性路由</b></td><td><button class="sw" role="switch" aria-checked="true"></button></td></tr>
+        <tr><td><b>按天用量统计</b></td><td><button class="sw" role="switch" aria-checked="true"></button></td></tr>
+        <tr><td><b>统计保留天数</b><div class="muted" style="font-size:11.5px">改动需重启进程</div></td><td><input type="number" value="30" min="1" style="width:100px"></td></tr>
+      </tbody></table></div>
+      <p class="faint" style="font-size:11.5px;margin-top:8px">统计按自然日聚合并落盘，供「用量统计」页出趋势与排行；落盘路径默认与状态文件同目录（手工编辑配置文件可改）。</p>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:10px;margin-top:4px">
+      <span class="muted" style="font-size:12px" id="cfgNote"></span>
+      <span style="flex:1"></span>
+      <button class="btn" id="cfgDiscard">放弃修改</button>
+      <button class="btn pri" id="cfgSave">保存配置</button>
+    </div>
+  </div>
+
+  <!-- ================= 运行日志 ================= -->
+  <div class="tabpanel" id="tp-logs">
+    <div class="sect">
+      <div class="sect-head">
+        <div class="seg" id="logCh"><button class="on" data-ch="all">全部</button><button data-ch="task">任务</button><button data-ch="chat">对话</button><button data-ch="sys">系统</button></div>
+        <span class="sp"></span><span class="sub" id="logNote">任务 3 · 对话 4 · 系统 3</span>
+        <button class="btn xs" id="autoScrollBtn">自动滚动：开</button>
+      </div>
+      <pre class="logpre" id="wlog"></pre>
+    </div>
+  </div>
+</div>
+
+<!-- 添加账号 -->
+<div class="veil" id="addVeil" role="dialog" aria-modal="true">
+  <div class="modal" style="width:min(560px,calc(100vw - 40px))">
+    <h3>添加账号</h3>
+    <p class="sub">浏览器完成腾讯账号登录，网关自动接续签到并载入账号池，无需重启。</p>
+    <div id="addForm">
+      <div style="margin-bottom:12px"><b style="font-size:13px">版本：</b>
+        <label class="check" style="margin-right:16px"><input type="radio" name="wbrealm" checked> 国内版（CN）</label>
+        <label class="check"><input type="radio" name="wbrealm"> 国际版（Global）</label></div>
+      <p class="faint" style="font-size:11.5px;margin:0 0 14px">国际版登录后，网关自动完成注册地区、激活与试用额度领取，全程无需手动操作。</p>
+    </div>
+    <div id="addWaiting" style="display:none;text-align:left">
+      <p style="font-size:13px" id="waitText">正在获取授权链接<span class="cursor-blink"></span></p>
+      <div id="addLinkRow" style="display:none">
+        <p style="font-size:13px;margin:12px 0 0">在浏览器打开以下链接并登录：</p>
+        <div class="linkbox" id="authUrl">https://workbuddy.example.com/oauth?state=wb_7f2a</div>
+        <p class="muted" style="font-size:12.5px">等待授权完成，自动检测中<span class="cursor-blink"></span></p>
+      </div>
+    </div>
+    <div id="addDone" style="display:none;text-align:center">
+      <div class="okbig">✓</div>
+      <p style="font-size:13.5px;font-weight:600;margin:0">已添加 lin_yizhou_02（国内版）· 积分 5,000/5,000，账号已载入池中</p>
+    </div>
+    <div class="acts">
+      <button class="btn" data-close>关闭</button>
+      <button class="btn" id="btnCopyLink" style="display:none" data-copy="#authUrl">复制链接</button>
+      <button class="btn" id="btnOpenLink" style="display:none">在浏览器打开</button>
+      <button class="btn pri" id="btnGetLink">获取授权链接</button>
+    </div>
+  </div>
+</div>
+
+<!-- 积分任务 -->
+<div class="veil" id="taskVeil" role="dialog" aria-modal="true">
+  <div class="modal" style="width:min(760px,calc(100vw - 40px))">
+    <h3>积分任务 <span class="muted" style="font-size:12px;font-weight:500" id="taskWho">· a1b2c3d4e5f67890</span></h3>
+    <p class="sub">查询上游任务进度；「接受」为报名（幂等），「领取」在进度达标后可用。所有操作走网关，无需外部脚本。</p>
+    <div class="tbox"><table>
+      <thead><tr><th>任务</th><th style="width:90px">进度</th><th style="width:110px">奖励</th><th style="width:96px">状态</th><th style="width:150px"></th></tr></thead>
+      <tbody id="taskBody"></tbody>
+    </table></div>
+    <div class="acts">
+      <button class="btn" id="taskAcceptAll">全部接受</button>
+      <button class="btn pri" id="taskAutoAll">一键完成可自动任务</button>
+      <button class="btn" id="taskRequery">重新查询</button>
+      <button class="btn" data-close>关闭</button>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+<script>
+/* ================= 账号池 ================= */
+var ACCTS=[
+  {nm:'lin_yizhou',gl:false,st:'ok',stT:'可用',reason:'',q:48,qt:'2,395',qmax:'4,950',ok:83,bad:0,inf:0,
+   u:[['cy','312次'],['cy','18.4万tok'],['am','412ms'],['gr','38.2tok/s']],ago:'3 分钟前'},
+  {nm:'chen.nor',gl:true,st:'rate',stT:'限流冷却 · 28分',reason:'连续 429',q:16,qt:'812',qmax:'5,000',ok:47,bad:12,inf:2,
+   u:[['cy','47次'],['cy','3.1万tok'],['am','—'],['gr','—']],ago:'12 分钟前'},
+  {nm:'mango_dev',gl:false,st:'credit',stT:'积分冷却 · 2时10分',reason:'积分耗尽，等待恢复',q:2,qt:'96',qmax:'5,200',ok:210,bad:3,inf:0,
+   u:[['cy','210次'],['cy','9.6万tok'],['am','1.2s'],['gr','21.0tok/s']],ago:'1 小时前'},
+  {nm:'wushuang_02',gl:false,st:'dis',stT:'已禁用',reason:'手动禁用',q:71,qt:'3,540',qmax:'4,980',ok:19,bad:1,inf:0,
+   u:[['cy','19次'],['cy','0.8万tok'],['am','—'],['gr','—']],ago:'2 天前',dis:true}
+];
+function acctOps(a){
+  var h='<button class="btn xs" data-op="签到完成，积分 2,395/4,950（签到成功）">签到</button> ';
+  h+='<button class="btn xs" data-op="余额已更新：'+a.qt+' / '+a.qmax+'">余额</button> ';
+  h+='<button class="btn xs" data-task="'+a.nm+'">任务</button> ';
+  h+=a.dis?'<button class="btn xs pri" data-op="已解冻">解冻</button> '
+          :'<button class="btn xs" data-confirm-dis>禁用</button> ';
+  h+='<button class="btn xs del" data-confirm-del>移除</button>';
+  return h;
+}
+$('#acctBody').innerHTML=ACCTS.map(function(a){
+  var rowCls=a.dis?'off-row':(a.st!=='ok'?'cool-row':'');
+  return '<tr class="'+rowCls+'">'+
+    '<td><span class="mark" style="'+(a.dis?'background:var(--bad)':a.st!=='ok'?'background:var(--warn)':'')+'"></span></td>'+
+    '<td><b style="font-size:13px">'+a.nm+'</b>'+(a.gl?' <span class="chip">国际版</span>':'')+'<div class="faint m" style="font-size:11px">a1b2'+a.nm.slice(0,8)+'…</div></td>'+
+    '<td><span class="st '+a.st+'"><i></i>'+a.stT+'</span>'+(a.reason?'<div class="faint" style="font-size:11px;margin-top:2px">'+a.reason+'</div>':'')+'</td>'+
+    '<td><span class="tok" style="font-size:12.5px">'+a.qt+'</span><span class="faint"> / '+a.qmax+'</span><div class="bar slim '+(a.q<10?'bad':a.q<30?'warn':'')+'" style="margin-top:4px;max-width:92px"><i style="width:'+a.q+'%"></i></div></td>'+
+    '<td>'+a.ok+' / <span style="color:'+(a.bad?'var(--bad)':'inherit')+'">'+a.bad+'</span></td>'+
+    '<td>'+a.inf+'</td>'+
+    '<td>'+a.u.map(function(p){return '<span class="pill '+p[0]+'">'+p[1]+'</span>'}).join('')+'</td>'+
+    '<td class="muted">'+a.ago+'</td>'+
+    '<td class="num-r" style="white-space:nowrap">'+acctOps(a)+'</td></tr>';
+}).join('');
+
+$('#acctBody').addEventListener('click',function(e){
+  var b=e.target.closest('button');if(!b)return;
+  if(b.dataset.batch!=null)return;
+  if(b.dataset.task){$('#taskWho').textContent='· '+b.dataset.task;openVeil($('#taskVeil'));return}
+  if(b.dataset.confirmDis){toast('禁用后该账号不再参与选号，需手动解冻才能恢复。确认禁用？（原型：已禁用）','err');return}
+  if(b.dataset.confirmDel){toast('移除账号将删除池状态与 auths/ 下的凭证文件，且不可恢复。（原型：已移除）','err');return}
+  if(b.dataset.op){toast(b.dataset.op,'ok')}
+});
+$$('[data-batch]').forEach(function(b){b.addEventListener('click',function(){toast(b.dataset.batch,'ok')})});
+$('#refreshBtn').addEventListener('click',function(){toast('余额已从上游刷新','ok')});
+
+/* 服务开关 / 重启 */
+var svcSwitch=$('#svcSwitch'),svcBadge=$('#svcBadge'),svcConfirm=$('#svcConfirm');
+svcSwitch.addEventListener('click',function(){
+  if(svcSwitch.getAttribute('aria-checked')==='true'){svcConfirm.style.display='flex'}
+  else bootMain();
+});
+$('#cfCancel').onclick=function(){svcConfirm.style.display='none'};
+$('#cfOk').onclick=function(){
+  svcConfirm.style.display='none';
+  svcSwitch.disabled=true;svcBadge.className='st stop';svcBadge.innerHTML='<i></i>停止中…';
+  setTimeout(function(){svcSwitch.setAttribute('aria-checked','false');svcSwitch.disabled=false;svcBadge.className='st stop';svcBadge.innerHTML='<i></i>已停止'},900);
+};
+function bootMain(){
+  svcSwitch.disabled=true;svcBadge.className='st boot';svcBadge.innerHTML='<i></i>启动中…';
+  setTimeout(function(){svcSwitch.disabled=false;svcSwitch.setAttribute('aria-checked','true');svcBadge.className='st run';svcBadge.innerHTML='<i></i>运行中'},1300);
+}
+$('#restartBtn').addEventListener('click',function(){
+  if(svcSwitch.getAttribute('aria-checked')!=='true')return bootMain();
+  svcSwitch.disabled=true;svcBadge.className='st boot';svcBadge.innerHTML='<i></i>重启中…';
+  setTimeout(function(){svcSwitch.disabled=false;svcBadge.className='st run';svcBadge.innerHTML='<i></i>运行中'},1400);
+});
+
+/* ================= 用量统计 ================= */
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+var DAYS=30;
+function gen(seed,base,amp){var r=mulberry32(seed),out=[];for(var i=0;i<DAYS;i++){var wk=(i%7===5||i%7===6)?.55:1;out.push(Math.round((base+amp*r())*wk*(0.75+0.25*Math.sin(i/4))))}return out}
+var SERIES=gen(22,640000,300000);
+var REQS=SERIES.map(function(v){return Math.round(v/1600)});
+var LABELS=SERIES.map(function(_,i){return dayLabel(i,DAYS)});
+chart($('#wbChart'),$('#wbTip'),[{name:'workbuddy',color:'#2f9e5f',data:SERIES}],'area',LABELS,{reqData:REQS,
+  onHover:function(i){return '<b>'+LABELS[i]+'</b>'+fmtTok(SERIES[i])+' tok · '+fmtInt(REQS[i])+' 次'}});
+$('#rngChips').addEventListener('click',function(e){
+  var b=e.target.closest('button');if(!b)return;
+  this.querySelectorAll('button').forEach(function(x){x.classList.toggle('on',x===b)});
+  var k=b.dataset.rng==='today'?1:b.dataset.rng==='7d'?7:30;
+  var slice=SERIES.slice(DAYS-k);
+  var tot=slice.reduce(function(a,b){return a+b},0);
+  $('#rTok').textContent=fmtTok(tot);
+  $('#rIn').textContent=fmtTok(Math.round(tot*0.62));
+  $('#rOut').textContent=fmtTok(Math.round(tot*0.38));
+  $('#rReq').textContent=fmtInt(Math.round(tot/1600));
+  $('#chartUnit').textContent=b.dataset.rng==='today'?'按小时（CST）':'按自然日（CST） · 峰值 '+fmtTok(Math.max.apply(null,slice))+' @ 10-04';
+});
+$('#wModBody').innerHTML=[
+  ['claude-sonnet-4-5','132.4万','42%',341,'81.9万 / 50.5万'],
+  ['glm-5.2','98.6万','32%',253,'61.0万 / 37.6万'],
+  ['gpt-5-codex','52.3万','17%',134,'32.4万 / 19.9万'],
+  ['kimi-k2','28.6万','9%',84,'17.7万 / 10.9万']
+].map(function(m){
+  return '<tr><td class="m" style="font-weight:600">'+m[0]+'</td><td class="num-r">'+m[1]+'</td>'+
+  '<td><div style="display:flex;align-items:center;gap:8px"><span class="tok muted" style="font-size:12px">'+m[2]+'</span><div class="bar"><i style="width:'+m[2]+'"></i></div></div></td>'+
+  '<td class="num-r">'+fmtInt(m[3])+'</td><td class="num-r muted">'+m[4]+'</td></tr>';
+}).join('');
+$('#wAcctBody').innerHTML=[
+  ['lin_yizhou','143.2万','46%',374,0],
+  ['chen.nor','87.1万','28%',227,12],
+  ['mango_dev','65.5万','21%',171,3],
+  ['wushuang_02','16.1万','5%',40,1]
+].map(function(m){
+  return '<tr><td style="font-weight:600">'+m[0]+'</td><td class="num-r">'+m[1]+'</td>'+
+  '<td><div style="display:flex;align-items:center;gap:8px"><span class="tok muted" style="font-size:12px">'+m[2]+'</span><div class="bar"><i style="width:'+m[2]+'"></i></div></div></td>'+
+  '<td class="num-r">'+fmtInt(m[3])+'</td><td class="num-r" style="color:'+(m[4]?'var(--bad)':'var(--faint)')+'">'+fmtInt(m[4])+'</td></tr>';
+}).join('');
+
+/* ================= 任务中心 ================= */
+var SCHOOL_ROWS=[
+  {nm:'lin_yizhou',cells:[['done','已领'],['done','已领'],['part','◐ 2/3'],['done','已领'],['skip','—不做']],lot:3,full:true},
+  {nm:'chen.nor',cells:[['done','已领'],['avail','可领'],['todo','未做'],['todo','未做'],['skip','—不做']],lot:1,full:false},
+  {nm:'mango_dev',cells:[['done','已领'],['done','已领'],['done','已领'],['avail','可领'],['skip','—不做']],lot:0,full:false},
+  {nm:'wushuang_02',cells:[['part','◐ 1/3'],['todo','未做'],['todo','未做'],['todo','未做'],['skip','—不做']],lot:'—',full:false}
+];
+$('#schoolBody').innerHTML=SCHOOL_ROWS.map(function(r){
+  var tips=['分享活动 +100c','桌面端体验 +100c（单次）','和 AI 对话 3 次 +50c','召唤开学季专家 +50c','学生认证 +100c（需真实认证，不做）'];
+  return '<tr><td style="font-weight:600">'+r.nm+'</td>'+
+    r.cells.map(function(c,i){return '<td><span class="cell '+c[0]+'" title="'+tips[i]+'"><span class="s">'+({done:'✓',avail:'◆',part:'◐',todo:'○',skip:'—'}[c[0]])+'</span>'+c[1]+'</span></td>'}).join('')+
+    '<td class="num-r tok">'+r.lot+'</td></tr>';
+}).join('');
+$('#schoolRun').addEventListener('click',function(){toast('开学季闭环已开始，结果看任务日志','ok')});
+$('#schoolRefresh').addEventListener('click',function(){toast('开学季状态已刷新','ok')});
+$('#scanBtn').addEventListener('click',function(){this.textContent='扫描中…';var b=this;setTimeout(function(){b.textContent='扫描待办';toast('队列已启动：7 项（并发 3）','ok')},900)});
+$('#runQueueBtn').addEventListener('click',function(){toast('将依次执行：补报对话事件、领取 Buddy、glm-5.2 对话、尝试上报。约 1-2 分钟（原型：已启动）','ok')});
+
+/* 积分任务弹层 */
+var TASKS=[
+  {nm:'对话活跃 ×5',code:'chat_5',tag:'开学季',cur:5,tgt:5,rw:'+50 分',st:'done',stT:'已领取',op:null},
+  {nm:'领取第一只 Buddy',code:'first_buddy',tag:'',cur:1,tgt:1,rw:'Buddy',st:'warn',stT:'可领取',op:'领取',auto:'上报解锁 → 同意协议 → 领取第一只 Buddy'},
+  {nm:'glm-5.2 真实对话',code:'Model_chat_GLM5.2',tag:'',cur:1,tgt:3,rw:'+200 分',st:'mute',stT:'进行中',op:'一键完成',auto:'接受任务 → glm-5.2 真实对话一次 → 对齐模型上报'},
+  {nm:'设计创意画布创建',code:'create_canvas',tag:'',cur:null,tgt:null,rw:'+300 分',st:'warn',stT:'可领取',op:'领取'},
+  {nm:'使用模板创建任务 ×5',code:'template_5',tag:'',cur:3,tgt:5,rw:'+150 分',st:'mute',stT:'进行中',op:'一键完成',auto:'上报「使用模板创建任务」事件组 ×5（三账号实测点亮）'},
+  {nm:'定时任务创建',code:'automation_1',tag:'',cur:null,tgt:null,rw:'+100 分',st:'mute',stT:'未接受',op:'接受'}
+];
+$('#taskBody').innerHTML=TASKS.map(function(t,i){
+  var prog=t.cur==null?'—':t.tgt?t.cur+' / '+t.tgt:String(t.cur);
+  var op='';
+  if(t.op==='领取')op='<button class="btn xs pri" data-claim="'+i+'">领取</button>';
+  else if(t.op==='接受')op='<button class="btn xs" data-accept="'+i+'">接受</button>';
+  else if(t.op==='一键完成')op='<button class="btn xs pri" data-auto="'+i+'" title="'+(t.auto||'')+'">一键完成</button>';
+  else op='<span class="faint" style="font-size:12px">—</span>';
+  return '<tr><td><b style="font-size:13px">'+t.nm+'</b>'+(t.tag?' <span class="chip">'+t.tag+'</span>':'')+'<div class="faint m" style="font-size:11px">'+t.code+'</div></td>'+
+  '<td class="tok">'+prog+'</td><td class="tok">'+t.rw+'</td>'+
+  '<td><span class="st '+t.st+'"><i></i>'+t.stT+'</span></td>'+
+  '<td class="num-r">'+op+'</td></tr>';
+}).join('');
+$('#taskBody').addEventListener('click',function(e){
+  var b=e.target.closest('button');if(!b)return;
+  if(b.dataset.claim!=null){toast('已领取奖励','ok');return}
+  if(b.dataset.accept!=null){toast('已接受任务','ok');return}
+  if(b.dataset.auto!=null){toast('已执行（进度 1 → 2），奖励未达标','ok')}
+});
+$('#taskAcceptAll').addEventListener('click',function(){toast('已接受 1 个任务','ok')});
+$('#taskAutoAll').addEventListener('click',function(){toast('执行完成：成功 3 项，跳过 1 项，失败 0 项','ok')});
+$('#taskRequery').addEventListener('click',function(){toast('查询中…')});
+
+/* ================= 配置 ================= */
+$('#cfgSave').addEventListener('click',function(){toast('配置已保存，其中 5 项需重启进程生效','ok')});
+$('#cfgDiscard').addEventListener('click',function(){$('#cfgNote').textContent='已还原为上次保存的配置'});
+$('#keyToggle').addEventListener('click',function(){
+  var el=$('#wbKey'),show=el.type==='password';
+  el.type=show?'text':'password';this.textContent=show?'隐藏':'显示';
+});
+
+/* ================= 运行日志 ================= */
+var LOGS=[
+  ['task','16:02:58','签到 lin_yizhou 成功 +50 积分'],
+  ['task','16:01:12','扫描待办：2 项入队（账号间并发 3）'],
+  ['chat','16:00:41','200 claude-sonnet-4-5 stream 2.31s 48,204 tok'],
+  ['sys','16:00:02','balance_refresh: 4 账号余额已更新'],
+  ['chat','15:58:41','200 glm-5.2 stream 2.31s 12,804 tok'],
+  ['task','15:57:03','warn chen.nor 触发限流冷却，28min 后重试'],
+  ['chat','15:55:29','429 claude-sonnet-4-5 冷却中，切换账号'],
+  ['sys','15:52:10','travel: 旅行巡检完成 4/4 正常'],
+  ['chat','15:50:18','200 gpt-5-codex stream 2.62s 18,921 tok'],
+  ['task','15:48:44','开学季 mango_dev：对话×3 ◐ 2/3']
+];
+function renderLog(ch){
+  $('#wlog').innerHTML=LOGS.filter(function(l){return ch==='all'||l[0]===ch}).map(function(l){
+    var cls=/error|失败|429/.test(l[2])?'l-err':/warn|冷却|熔断/.test(l[2])?'l-warn':'';
+    return '<div class="'+cls+'"><span class="l-ch '+l[0]+'">'+(l[0]==='task'?'任务':l[0]==='chat'?'对话':'系统')+'</span>'+l[1]+'  '+l[2]+'</div>';
+  }).join('');
+}
+renderLog('all');
+$('#logCh').addEventListener('click',function(e){
+  var b=e.target.closest('button');if(!b)return;
+  this.querySelectorAll('button').forEach(function(x){x.classList.toggle('on',x===b)});
+  renderLog(b.dataset.ch);
+});
+$('#autoScrollBtn').addEventListener('click',function(){
+  var on=this.textContent.endsWith('开');
+  this.textContent=on?'自动滚动：关':'自动滚动：开';
+});
+$('#mdRefresh').addEventListener('click',function(){toast('已重新获取（实时查询上游）','ok')});
+
+/* ================= 添加账号 ================= */
+initTabs('#svcTabs');
+var addVeil=$('#addVeil');wireVeil(addVeil);
+$('#addBtn').addEventListener('click',function(){resetAdd();openVeil(addVeil)});
+function resetAdd(){
+  $('#addForm').style.display='';$('#addWaiting').style.display='none';$('#addDone').style.display='none';
+  $('#addLinkRow').style.display='none';$('#btnGetLink').style.display='';$('#btnGetLink').disabled=false;
+  $('#btnCopyLink').style.display='none';$('#btnOpenLink').style.display='none';
+}
+$('#btnGetLink').addEventListener('click',function(){
+  this.disabled=true;
+  $('#addForm').style.display='none';$('#addWaiting').style.display='';
+  setTimeout(function(){
+    $('#addLinkRow').style.display='';
+    $('#btnCopyLink').style.display='';$('#btnOpenLink').style.display='';
+    setTimeout(function(){
+      $('#addWaiting').style.display='none';$('#addDone').style.display='';
+      $('#btnCopyLink').style.display='none';$('#btnOpenLink').style.display='none';$('#btnGetLink').style.display='none';
+      setTimeout(function(){closeVeil(addVeil);toast('已添加 lin_yizhou_02（国内版）· 账号已载入池中','ok')},1600);
+    },2200);
+  },900);
+});
+$('#btnOpenLink').addEventListener('click',function(){toast('原型：实际环境将以原生 <a target=_blank> 打开授权页')});
+</script>
+</body>
+</html>

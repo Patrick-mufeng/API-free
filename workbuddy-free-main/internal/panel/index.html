@@ -1,0 +1,1023 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- workbuddy-free · 控制面板
+     本文件为 go:embed 进二进制的单文件前端（无外部构建步骤）。
+     约束：页面不得出现内联脚本标签（CSP script-src 'self' 会拦），脚本体必须留在 app.js。
+     注记：此处刻意不写出那个标签的字面量——frontend_test.go 对全文件做子串扫描，
+     注释里出现同样会被判为内联脚本。
+     Patrick优化 -->
+<title>workbuddy-free · 控制台</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%230b0e14'/%3E%3Cg fill='%232ad4e8'%3E%3Crect x='3' y='1' width='2' height='1'/%3E%3Crect x='11' y='1' width='2' height='1'/%3E%3Crect x='2' y='2' width='4' height='1'/%3E%3Crect x='10' y='2' width='4' height='1'/%3E%3Crect x='2' y='3' width='12' height='1'/%3E%3Crect x='1' y='4' width='14' height='3'/%3E%3Crect x='1' y='7' width='3' height='2'/%3E%3Crect x='6' y='7' width='4' height='2'/%3E%3Crect x='12' y='7' width='3' height='2'/%3E%3Crect x='1' y='9' width='14' height='1'/%3E%3Crect x='1' y='10' width='6' height='1'/%3E%3Crect x='9' y='10' width='6' height='1'/%3E%3Crect x='1' y='11' width='14' height='1'/%3E%3Crect x='2' y='12' width='12' height='1'/%3E%3Crect x='3' y='13' width='10' height='1'/%3E%3Crect x='4' y='14' width='8' height='1'/%3E%3C/g%3E%3C/svg%3E">
+<style>
+/* ── 设计令牌：PIXEL OPS ────────────────────────────────────────────────
+   像素终端语言：深蓝黑底 + 单一青色强调（仅交互），直角、硬投影（位移块而非
+   模糊）、2px 描边、网格底纹与 CRT 扫描线。等宽字体贯穿全站（像素终端的核心
+   信号），tabular-nums 对齐所有观测值。
+   注意：CSP 的 default-src 'none' 使 font-src 也为 none——不得引入任何外部或
+   内嵌字体，像素感全部由系统等宽字体 + CSS 绘制（直角/硬投影/dither）达成。 */
+:root {
+  color-scheme: dark;
+  /* 表面分层 */
+  --bg: #0b0e14; --surface: #11161f; --surface-2: #171d28; --raise: #1d2533;
+  --line: #2d3849; --line-soft: #212a38;
+  /* 文字三层 */
+  --ink: #dce7f2; --ink-2: #94a5ba; --ink-3: #61738a;
+  /* 唯一装饰强调色 + 语义色（语义只给状态） */
+  --accent: #2ad4e8; --accent-ink: #04161a; --accent-soft: rgba(42,212,232,.12);
+  --ok: #46d67f; --ok-soft: rgba(70,214,127,.12);
+  --warn: #f5b544; --warn-soft: rgba(245,181,68,.12);
+  --bad: #ff5d6c; --bad-soft: rgba(255,93,108,.12);
+  --inset: rgba(0,0,0,.28);
+  /* 硬投影：无模糊的位移块，像素风的骨架 */
+  --shadow: 4px 4px 0 0 rgba(0,0,0,.5);
+  --shadow-sm: 3px 3px 0 0 rgba(0,0,0,.45);
+  --shadow-lg: 8px 8px 0 0 rgba(0,0,0,.6);
+  /* 底纹与扫描线 */
+  --grid: rgba(42,212,232,.045);
+  --grid-step: 34px;
+  --scan: rgba(0,0,0,.24);
+  --scan-opacity: .5;
+  /* 字体：全等宽（无外部字体可用，见上方 CSP 注记） */
+  --mono: ui-monospace, "Cascadia Mono", "JetBrains Mono", "SF Mono", Consolas, "Courier New", monospace;
+  --sans: var(--mono);
+  /* z 轴刻度：集中声明，避免散落的魔法数字 */
+  --z-sticky: 20; --z-veil: 60; --z-toast: 90; --z-fx: 200;
+}
+[data-theme="light"] {
+  color-scheme: light;
+  --bg: #e9edf3; --surface: #ffffff; --surface-2: #f1f4f9; --raise: #ffffff;
+  --line: #b7c2d3; --line-soft: #d9e1ea;
+  --ink: #0c1119; --ink-2: #43536a; --ink-3: #78899e;
+  --accent: #0b7f96; --accent-ink: #ffffff; --accent-soft: rgba(11,127,150,.1);
+  --ok: #0f7a48; --ok-soft: rgba(15,122,72,.1);
+  --warn: #96600a; --warn-soft: rgba(150,96,10,.1);
+  --bad: #c02b34; --bad-soft: rgba(192,43,52,.09);
+  --inset: rgba(12,17,25,.06);
+  --shadow: 4px 4px 0 0 rgba(12,17,25,.16);
+  --shadow-sm: 3px 3px 0 0 rgba(12,17,25,.14);
+  --shadow-lg: 8px 8px 0 0 rgba(12,17,25,.2);
+  --grid: rgba(11,127,150,.06);
+  --scan-opacity: 0; /* 浅色下关掉扫描线：白底叠加暗线会脏 */
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body {
+  background: var(--bg); color: var(--ink); font: 13px/1.6 var(--mono);
+  -webkit-font-smoothing: antialiased;
+}
+/* 全屏纹理层：网格 + 扫描线，永远置顶且不拦截事件（z 用刻度令牌）。 */
+body::before {
+  content: ""; position: fixed; inset: 0; z-index: var(--z-fx); pointer-events: none;
+  background-image:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: var(--grid-step) var(--grid-step);
+}
+body::after {
+  content: ""; position: fixed; inset: 0; z-index: var(--z-fx); pointer-events: none;
+  background: repeating-linear-gradient(0deg, var(--scan) 0 1px, transparent 1px 3px);
+  opacity: var(--scan-opacity);
+}
+::selection { background: var(--accent); color: var(--accent-ink); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* 滚动条也做成方块：像素风不接受圆角滑块 */
+* { scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+::-webkit-scrollbar { width: 12px; height: 12px; }
+::-webkit-scrollbar-track { background: var(--surface-2); }
+::-webkit-scrollbar-thumb { background: var(--line); border: 2px solid var(--surface-2); }
+::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+/* ── 壳层：左侧导航 + 主区 ─────────────────────────────────────────── */
+.shell { display: grid; grid-template-columns: 216px 1fr; min-height: 100vh; position: relative; z-index: 1; }
+.nav {
+  background: var(--surface); border-right: 2px solid var(--line);
+  display: flex; flex-direction: column; position: sticky; top: 0; height: 100vh;
+}
+.brand { padding: 17px 15px 14px; border-bottom: 2px solid var(--line); }
+/* 品牌标记：像素 Buddy 猫头（内联 SVG，fill 继承强调色）。
+   取代此前的 CSS 缺角方块——9px 下像素方块读不出形状，猫头需要 18px 才成型。 */
+.brand .name {
+  font-weight: 700; letter-spacing: .1em; font-size: 12.5px; text-transform: uppercase;
+  display: flex; align-items: center; gap: 8px;
+}
+.brand .logo { width: 18px; height: 18px; flex: none; fill: var(--accent); }
+.brand .sub { color: var(--ink-3); font-size: 10.5px; font-family: var(--mono); margin-top: 4px; letter-spacing: .14em; }
+.nav ul { list-style: none; padding: 9px 9px; flex: 1; }
+.nav a {
+  display: flex; align-items: center; gap: 9px; padding: 7px 10px; margin-bottom: 3px;
+  color: var(--ink-2); text-decoration: none; font-size: 12.5px;
+  border: 2px solid transparent; letter-spacing: .02em;
+}
+.nav a:hover { background: var(--surface-2); color: var(--ink); border-color: var(--line-soft); }
+.nav a.on {
+  background: var(--accent-soft); color: var(--accent); font-weight: 700;
+  border-color: var(--accent); box-shadow: inset 4px 0 0 0 var(--accent);
+}
+.nav a svg { width: 15px; height: 15px; flex: none; opacity: .9; }
+.nav .sig { padding: 11px 15px; border-top: 2px solid var(--line); font-size: 11px; color: var(--ink-3); }
+.nav .sig .row { display: flex; align-items: center; gap: 7px; }
+.nav .sig .credit { margin-top: 7px; letter-spacing: .08em; opacity: .8; }
+/* 日志频道筛选 chips */
+.chips { display: inline-flex; gap: 5px; align-items: center; }
+.chips .chip { padding: 2px 9px; }
+.chips .chip.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 700; }
+.ln .lch { font-style: normal; display: inline-block; font-size: 10px; line-height: 1; padding: 2px 5px; margin-right: 8px; vertical-align: 1px; font-weight: 700; }
+.ln .lch.c-task { background: var(--accent-soft); color: var(--accent); }
+.ln .lch.c-chat { background: var(--ok-soft); color: var(--ok); }
+.ln .lch.c-sys { background: var(--surface-2); color: var(--ink-3); }
+
+/* 任务中心 */
+.tc-empty { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 42px 16px; color: var(--ink-3); }
+.tc-empty svg { width: 42px; height: 42px; opacity: .5; margin-bottom: 6px; }
+.tc-empty .t { font-weight: 700; color: var(--ink-2); letter-spacing: .04em; }
+.tc-empty .d { font-size: 12px; max-width: 34em; text-align: center; }
+.sel-note { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--ink-3); white-space: nowrap; flex: none; }
+.sel-note select {
+  appearance: none; -webkit-appearance: none;
+  background: var(--bg) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23888' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 8px center;
+  border: 2px solid var(--line); color: var(--ink);
+  font: 700 11.5px var(--mono); padding: 3px 22px 3px 8px; cursor: pointer;
+}
+.qprog { display: flex; align-items: center; gap: 12px; padding: 12px 15px 0; }
+.qprog .qbar { flex: 1; height: 8px; background: var(--bg); border: 1px solid var(--line); overflow: hidden; }
+.qprog .qbar i {
+  display: block; height: 100%; width: 0; transition: width .5s steps(12);
+  background-image: repeating-linear-gradient(90deg, var(--accent) 0 3px, transparent 3px 5px);
+}
+.qprog .note { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.qgroup { padding: 4px 0 10px; }
+.qgroup + .qgroup { border-top: 1px solid var(--line-soft); }
+.qgroup header {
+  display: flex; align-items: baseline; gap: 9px; padding: 10px 15px 6px;
+  background: none; border: none; box-shadow: none;
+}
+.qgroup header .nm { font-weight: 700; font-size: 12.5px; letter-spacing: .04em; }
+.qgroup header .cnt { font-size: 11.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.qrow {
+  display: grid; grid-template-columns: 118px 1fr 52px 84px minmax(120px, 240px);
+  gap: 10px; align-items: center; padding: 7px 15px; font-size: 12.5px;
+}
+.qrow:hover { background: var(--surface-2); }
+.qrow .code { font: 11px/1.35 var(--mono); color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qrow .name { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.qrow .name .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qrow .prog { font-variant-numeric: tabular-nums; color: var(--ink-2); text-align: right; }
+.qrow .st { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.qrow .msg { font-size: 11.5px; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 状态方块（非圆点）：像素语言里状态即像素 */
+.qdot { width: 8px; height: 8px; flex: none; }
+.qdot.done { background: var(--ok); }
+.qdot.run { background: var(--accent); animation: qpulse 1.1s steps(2) infinite; }
+.qdot.wait { background: none; border: 2px solid var(--ink-3); }
+.qdot.err { background: var(--bad); }
+.qdot.skip { background: var(--ink-3); }
+@keyframes qpulse { 50% { opacity: .3; } }
+@media (prefers-reduced-motion: reduce) { .qdot.run { animation: none; } }
+.srow { display: grid; grid-template-columns: minmax(150px, 210px) 1fr auto; gap: 14px; align-items: center; padding: 12px 15px; }
+.srow + .srow { border-top: 1px solid var(--line-soft); }
+.srow .who .nm { font-weight: 700; font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.srow .who .id { font: 10px var(--mono); color: var(--ink-3); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.shead {
+  display: grid; grid-template-columns: minmax(150px, 210px) 1fr auto;
+  gap: 14px; align-items: center; padding: 9px 15px 7px;
+  font-size: 10.5px; color: var(--ink-3); border-bottom: 1px solid var(--line-soft);
+  letter-spacing: .08em; text-transform: uppercase;
+}
+.shead .stasks span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stasks { display: grid; grid-template-columns: repeat(5, minmax(64px, 1fr)); gap: 6px 10px; }
+.stask { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink-2); }
+.stask .mark { font-size: 13px; line-height: 1; width: 14px; text-align: center; flex: none; }
+.stask.ok .mark { color: var(--ok); }
+.stask.warn .mark { color: var(--warn); } .stask.warn .fr { color: var(--warn); font-variant-numeric: tabular-nums; }
+.stask.todo { color: var(--ink-3); }
+.srow .luck { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--ink-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.srow .luck svg { width: 14px; height: 14px; opacity: .7; }
+.srow .err { grid-column: 1 / -1; font-size: 11.5px; color: var(--bad); margin-top: -4px; }
+.pulse { width: 8px; height: 8px; background: var(--ok); flex: none; box-shadow: 0 0 0 2px var(--ok-soft); }
+.pulse.bad { background: var(--bad); box-shadow: 0 0 0 2px var(--bad-soft); }
+.pulse.warn { background: var(--warn); box-shadow: 0 0 0 2px var(--warn-soft); }
+
+.main { min-width: 0; display: flex; flex-direction: column; }
+.topbar {
+  display: flex; align-items: center; gap: 12px; padding: 13px 22px;
+  border-bottom: 2px solid var(--line); background: var(--surface);
+  position: sticky; top: 0; z-index: var(--z-sticky);
+}
+.topbar h2 { font-size: 13px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+.topbar .sep { color: var(--accent); font-weight: 700; }
+.topbar .meta { color: var(--ink-3); font-size: 11.5px; font-family: var(--mono); }
+.topbar .grow { flex: 1; }
+.view { padding: 20px 22px 60px; max-width: 1240px; width: 100%; }
+.view[hidden] { display: none; }
+
+/* ── 控件 ─────────────────────────────────────────────────────────── */
+/* 像素按钮：硬投影 + 按下位移，过渡用 steps() 制造跳变而非平滑缓动 */
+button {
+  font: inherit; font-size: 12.5px; letter-spacing: .02em;
+  color: var(--ink); background: var(--surface-2);
+  border: 2px solid var(--line); padding: 6px 12px; cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: transform .07s steps(2), box-shadow .07s steps(2),
+              background .12s, border-color .12s, color .12s;
+}
+button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+button:active:not(:disabled) { transform: translate(3px, 3px); box-shadow: 0 0 0 0 transparent; }
+button:disabled { opacity: .45; cursor: default; }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 700; }
+button.primary:hover:not(:disabled) { filter: brightness(1.12); color: var(--accent-ink); }
+button.ghost { background: transparent; }
+button.danger { color: var(--bad); }
+button.danger:hover:not(:disabled) { border-color: var(--bad); color: var(--bad); }
+button.xs { padding: 3px 8px; font-size: 11.5px; box-shadow: 2px 2px 0 0 rgba(0,0,0,.4); }
+button.xs:active:not(:disabled) { transform: translate(2px, 2px); }
+button.icon { padding: 6px 8px; }
+input, select {
+  font: inherit; font-size: 12.5px; color: var(--ink); background: var(--bg);
+  border: 2px solid var(--line); padding: 6px 10px; width: 100%;
+  box-shadow: inset 2px 2px 0 0 var(--inset);
+  transition: border-color .12s, box-shadow .12s;
+}
+input:focus, select:focus { outline: none; border-color: var(--accent); }
+/* checkbox / radio 必须显式重置宽度与内边距：通用规则 input{width:100%;padding:6px 10px}
+   会把它们撑开（border-box 下 padding 不可压缩，radio 实测被撑成 24×16 的矩形，
+   并把同行文字挤到折行）。 */
+input[type=checkbox], input[type=radio] { width: auto; padding: 0; accent-color: var(--accent); box-shadow: none; flex: none; }
+input[type=checkbox] { width: 16px; height: 16px; }
+/* 单选改方形：原生圆形与像素语言冲突，appearance:none 后自绘方块 + 内嵌孔 */
+input[type=radio] { appearance: none; -webkit-appearance: none; width: 15px; height: 15px; border: 2px solid var(--line); background: var(--bg); cursor: pointer; transition: border-color .12s, background .12s; }
+input[type=radio]:checked { border-color: var(--accent); background: var(--accent); box-shadow: inset 0 0 0 2px var(--bg); }
+label.fld { display: block; margin-bottom: 14px; }
+label.fld > .lb { display: block; font-size: 11.5px; color: var(--ink-2); margin-bottom: 5px; letter-spacing: .04em; }
+label.fld > .hint { display: block; font-size: 11px; color: var(--ink-3); margin-top: 4px; }
+.inline { display: flex; align-items: center; gap: 9px; }
+/* flex 容器里的按钮必须禁收缩：input 的 width:100% 会把它压到最小内容宽，
+   中文按钮随即逐字断行（「显示」会被拆成竖排两行）。 */
+.inline > input { min-width: 0; }
+.inline > button { flex: none; }
+
+/* ── 统计条（观测区）──────────────────────────────────────────────── */
+.stats {
+  display: grid; grid-template-columns: repeat(6, 1fr);
+  border: 2px solid var(--line); background: var(--surface);
+  overflow: hidden; margin-bottom: 18px; box-shadow: var(--shadow);
+}
+@media (max-width: 980px) { .stats { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 560px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+.stat { padding: 13px 15px; border-right: 1px solid var(--line-soft); border-bottom: 1px solid var(--line-soft); }
+.stat .v { font: 700 24px/1.15 var(--mono); font-variant-numeric: tabular-nums; letter-spacing: -.01em; white-space: nowrap; }
+.stat .k { color: var(--ink-3); font-size: 10.5px; margin-top: 5px; letter-spacing: .1em; }
+.stat.good .v { color: var(--ok); } .stat.warn .v { color: var(--warn); } .stat.bad .v { color: var(--bad); }
+
+/* ── 面板块 ───────────────────────────────────────────────────────── */
+.box {
+  background: var(--surface); border: 2px solid var(--line);
+  box-shadow: var(--shadow); margin-bottom: 18px; overflow: hidden;
+}
+.box > header {
+  display: flex; align-items: center; gap: 11px; padding: 10px 15px;
+  border-bottom: 2px solid var(--line); background: var(--surface-2);
+}
+/* 面板标题前的缺角方块标记（与品牌标记同族） */
+.box > header h3 { font-size: 12px; font-weight: 700; letter-spacing: .06em; display: flex; align-items: center; gap: 8px; }
+.box > header h3::before {
+  content: ""; width: 8px; height: 8px; flex: none; background: var(--accent);
+  clip-path: polygon(0 0, 100% 0, 100% 55%, 55% 55%, 55% 100%, 0 100%);
+}
+.box > header .grow { flex: 1; }
+.box > header .note { color: var(--ink-3); font-size: 11.5px; }
+.box .pad { padding: 16px; }
+
+/* ── 账号表（签名元素：健康色条 + 积分量条）───────────────────────── */
+.tbl-wrap { overflow-x: auto; }
+.acc { width: 100%; border-collapse: collapse; font-size: 12.5px; min-width: 640px; }
+.acc th {
+  text-align: left; font-weight: 700; font-size: 10.5px; color: var(--ink-3);
+  padding: 8px 10px; border-bottom: 2px solid var(--line); white-space: nowrap;
+  letter-spacing: .08em; text-transform: uppercase; background: var(--surface-2);
+}
+.acc td { padding: 10px; border-bottom: 1px solid var(--line-soft); vertical-align: middle; }
+.acc tr:last-child td { border-bottom: none; }
+.acc tbody tr:hover { background: var(--surface-2); }
+/* 健康色条用真实单元格（td.mark）实现，而不是 tr::before 伪元素：
+   伪元素在表格行内会被浏览器当作匿名单元格插入行首，整行内容右移一列、
+   与表头错位——窗口越宽列越宽越明显。 */
+.acc .mark { width: 4px; min-width: 4px; padding: 0; }
+.acc .mark i { display: block; width: 4px; height: 100%; min-height: 38px; background: var(--ok); }
+.acc tbody tr.cool .mark i { background: var(--warn); }
+.acc tbody tr.off .mark i { background: var(--bad); }
+/* 模型表无色条（健康指示只属于账号表）。 */
+.acc.md .mark { display: none; }
+/* 操作列用 width:1px + nowrap 的经典技巧：列宽恰为内容宽，其余列按内容自适应 */
+.acc .c-acts { width: 1px; white-space: nowrap; }
+/* 档位标签列：允许换行在标签之间（不拆字），并给足最小宽度 */
+.acc .efs { min-width: 150px; }
+.acc .efs .tag { margin: 1px 0; }
+/* 模型表：紧凑一些，7 列在常见窗口下尽量免横向滚动 */
+.acc.md { min-width: 700px; }
+.acc.md th, .acc.md td { padding: 9px 8px; }
+.who { min-width: 118px; max-width: 200px; }
+#taskTable .who { max-width: 360px; }
+#taskTable .who .nm, #taskTable .who .id { white-space: normal; word-break: break-all; }
+.who .nm { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.who .id { font-family: var(--mono); font-size: 11px; color: var(--ink-3); margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.realm-tag {
+  display: inline-block; margin-left: 6px; padding: 1px 5px; font: 700 9.5px/1.5 var(--mono);
+  color: var(--accent); background: var(--accent-soft);
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  vertical-align: 1px; letter-spacing: .06em; text-transform: uppercase;
+}
+.realm-row { display: flex; align-items: center; gap: 14px; padding: 4px 0 10px; }
+.realm-opt { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink-2); cursor: pointer; white-space: nowrap; }
+.realm-opt input { accent-color: var(--accent); margin: 0; box-shadow: none; }
+.num { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.usage-cell { min-width: 268px; }
+.usage-line {
+  display: inline-flex; align-items: center; gap: 4px; max-width: 100%;
+  font: 700 11px/1.3 var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.usage-item {
+  display: inline-flex; align-items: baseline; padding: 3px 6px; border: 1px solid transparent;
+  background: var(--surface-2);
+}
+.usage-item b { font-weight: 700; }
+.usage-item em { margin-left: 2px; font: 500 10px/1 var(--mono); font-style: normal; }
+.usage-count { color: var(--accent); background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 30%, transparent); }
+.usage-total {
+  color: var(--accent); background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 42%, transparent);
+  box-shadow: inset 2px 0 0 0 var(--accent);
+}
+.usage-total b { font-size: 11.5px; letter-spacing: -.01em; }
+.usage-total em { color: var(--ink-2); }
+.usage-latency { color: var(--warn); background: var(--warn-soft); border-color: color-mix(in srgb, var(--warn) 30%, transparent); }
+.usage-rate { color: var(--ok); background: var(--ok-soft); border-color: color-mix(in srgb, var(--ok) 30%, transparent); }
+.cred { min-width: 84px; }
+.cred .n { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 12.5px; white-space: nowrap; }
+.cred .n .of { color: var(--ink-3); font-size: 11px; }
+/* 量条走 dither：实心块之间留缝，读出像素颗粒感 */
+.bar { height: 8px; background: var(--bg); border: 1px solid var(--line); margin-top: 6px; overflow: hidden; max-width: 92px; }
+/* transform-origin 左端：量条的生长动效走 scaleX（合成层动画，不触发重排）。 */
+.bar i { display: block; height: 100%; transform-origin: left; background-image: repeating-linear-gradient(90deg, var(--accent) 0 3px, transparent 3px 5px); }
+.tag {
+  display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px;
+  font-size: 10.5px; font-weight: 700; white-space: nowrap; letter-spacing: .05em;
+  border: 1px solid transparent;
+}
+.tag.ok { background: var(--ok-soft); color: var(--ok); border-color: color-mix(in srgb, var(--ok) 35%, transparent); }
+.tag.warn { background: var(--warn-soft); color: var(--warn); border-color: color-mix(in srgb, var(--warn) 35%, transparent); }
+.tag.bad { background: var(--bad-soft); color: var(--bad); border-color: color-mix(in srgb, var(--bad) 35%, transparent); }
+.tag.mute { background: var(--surface-2); color: var(--ink-3); border-color: var(--line); }
+.acts { display: flex; gap: 5px; justify-content: flex-end; white-space: nowrap; }
+.acts button { padding: 3px 7px; font-size: 11.5px; white-space: nowrap; flex: none; box-shadow: 2px 2px 0 0 rgba(0,0,0,.4); }
+
+.empty { padding: 40px 20px; text-align: center; color: var(--ink-3); }
+.empty .big { font-size: 13px; color: var(--ink-2); margin-bottom: 6px; }
+
+/* ── 日志（终端质感）────────────────────────────────────────────── */
+#logBox {
+  max-height: 440px; overflow: auto; margin: 0; padding: 14px 16px;
+  font: 11.5px/1.75 var(--mono); white-space: pre-wrap; word-break: break-all; color: var(--ink-2);
+  background: var(--bg);
+  background-image: repeating-linear-gradient(0deg, var(--grid) 0 1px, transparent 1px 4px);
+}
+#logBox .ln { display: block; }
+#logBox .ln.e { color: var(--bad); }
+#logBox .ln.w { color: var(--warn); }
+
+/* ── 用量统计（消费计量）────────────────────────────────────────────
+   本页的签名元素是「消费节律」柱图：每根柱子由 3px/5px 的抖动块自下而上堆成
+   （与积分量条同一套纹理语言，只是把方向转成纵向），从 2px 基线往上长——读起来
+   像一台计量表，而不是圆角+渐变的通用图表。全页只有这一处用重手法，其余区块
+   沿用既有的观测条与表格语言。 */
+
+/* 累计头条：全页层级最高的一次观测。它与下方"区间"区块是两个数据源
+   （池内长期累计 vs 统计文件窗口），用 2px 线硬隔开并各自标注口径——
+   两个口径混在一处是这一页最容易误读的地方。
+   注：内层容器叫 .top 而不是 .main——.main 是壳层主区（flex-direction: column），
+   同名会让这里的横向排布被扭转成竖排且交叉轴右对齐。 */
+.hero { border: 2px solid var(--line); background: var(--surface); box-shadow: var(--shadow); margin-bottom: 18px; }
+.hero .top { display: flex; align-items: flex-end; gap: 30px; padding: 17px 19px 15px; flex-wrap: wrap; }
+.hero .big { display: flex; align-items: baseline; gap: 7px; }
+.hero .big b { font: 700 40px/1 var(--mono); font-variant-numeric: tabular-nums; letter-spacing: -.02em; color: var(--accent); }
+.hero .big i { font: 500 12px/1 var(--mono); font-style: normal; color: var(--ink-3); letter-spacing: .12em; }
+.hero .big .lb { font-size: 10.5px; color: var(--ink-3); letter-spacing: .1em; align-self: flex-end; padding-bottom: 3px; }
+/* 支撑读数推到右端：头条读作"左侧一个大数 + 右侧一组支撑值"的双锚点表头，
+   比全部挤在左边留出半行空白更像是刻意的版式。窄屏换行后取消右推，
+   否则第二行会被整体顶到右边。 */
+.hero .side { display: flex; gap: 26px; flex-wrap: wrap; margin-left: auto; }
+@media (max-width: 900px) { .hero .side { margin-left: 0; } }
+.hero .side .v { font: 700 15px/1.15 var(--mono); font-variant-numeric: tabular-nums; }
+.hero .side .k { font-size: 10.5px; color: var(--ink-3); letter-spacing: .08em; margin-top: 5px; }
+.hero .foot { padding: 9px 19px; border-top: 1px solid var(--line-soft); background: var(--surface-2); font-size: 11.5px; color: var(--ink-3); }
+
+/* 口径切换行：区间口径只作用于下面的观测条与图表；累计口径在头条里，互不干扰。 */
+.rngrow { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+.rngrow .note { color: var(--ink-3); font-size: 11.5px; }
+
+/* 图表：三行共用同一套 grid 轨道（auto-columns 1fr + 相同 gap），
+   柱、请求量细条、刻度标签因此天然对齐，无需测量像素。 */
+.chart { padding: 16px 16px 12px; }
+.plot, .strip, .scale { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 3px; }
+/* 柱体与细条用百分比高度，故行高必须是确定值、且各自有满高的容体——
+   否则百分比高度回退成 auto，柱子会塌成 0。 */
+.plot { height: 196px; border-bottom: 2px solid var(--line); }
+.strip { height: 24px; margin-top: 3px; }
+.scale { margin-top: 6px; }
+.scale span {
+  font: 500 9.5px/1 var(--mono); color: var(--ink-3); text-align: center;
+  white-space: nowrap; overflow: hidden; letter-spacing: .04em;
+}
+.col, .col-r { height: 100%; display: flex; align-items: flex-end; }
+.col { cursor: crosshair; outline-offset: 2px; }
+/* 柱体用纵向抖动：实心块之间留 2px 缝，与积分量条（横向 3px/5px）同族。 */
+.col .fill {
+  width: 100%; height: var(--h);
+  background-image: repeating-linear-gradient(0deg, var(--accent) 0 3px, transparent 3px 5px);
+  transform-origin: bottom;
+}
+/* 零值柱留一条地面刻线：否则空档看起来像"没数据"，而它其实是"那天真的没有"。 */
+.col.zero .fill { height: 2px; background-image: none; background: var(--line); }
+.col:hover .fill, .col.on .fill { background-color: var(--accent-soft); }
+.col.on .fill { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent); }
+/* 峰值柱顶一道横杠：给整张图一个比例参照（无刻度柱图读不出量级）。 */
+.col.peak .fill { position: relative; }
+.col.peak .fill::after {
+  content: ""; position: absolute; left: -2px; right: -2px; top: -3px; height: 2px; background: var(--accent);
+}
+/* 请求量细条：同一时间轴上的第二变量（调用了多少次），用次级色阶，
+   不与 token 柱争视觉——它回答的是"什么时候被限流过"。 */
+.strip .r { width: 100%; height: var(--r); background: var(--ink-3); opacity: .72; min-height: 2px; }
+.strip .r.zero { background: var(--line); opacity: 1; height: 1px; }
+.chart .legend {
+  display: flex; align-items: center; gap: 16px; margin-top: 10px;
+  font-size: 10.5px; color: var(--ink-3); letter-spacing: .06em;
+}
+.chart .legend i { display: inline-block; width: 10px; height: 8px; margin-right: 5px; vertical-align: -1px; }
+.chart .legend .lg-tok i { background-image: repeating-linear-gradient(0deg, var(--accent) 0 3px, transparent 3px 5px); }
+.chart .legend .lg-req i { background: var(--ink-3); opacity: .72; }
+/* 仪表读数槽：悬停/聚焦某根柱子时在这里出该点的明细，读数固定在一处刷新——
+   像仪器的一个数字窗口，而不是跟着鼠标跑的浮层（浮层要处理边缘翻转，且会挡住图）。 */
+.readout { font: 700 11.5px/1.3 var(--mono); color: var(--ink-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.readout b { color: var(--accent); }
+.readout .bad { color: var(--bad); }
+
+/* 排行两表并排（窄屏堆叠）：模型与账号，同一套 .acc 表格语言 + 积分列的抖动量条。 */
+.duo { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: start; }
+.duo > .box { margin-bottom: 0; }
+@media (max-width: 1000px) { .duo { grid-template-columns: 1fr; } }
+.duo .acc { min-width: 0; }
+.duo .acc th, .duo .acc td { padding: 8px 9px; }
+.duo .who { min-width: 0; }
+
+/* ── 配置表单 ─────────────────────────────────────────────────────── */
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 20px; }
+.grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0 16px; }
+@media (max-width: 860px) { .grid2, .grid3 { grid-template-columns: 1fr; } }
+fieldset { border: none; margin-bottom: 6px; }
+legend { font-size: 11.5px; color: var(--ink-3); font-weight: 700; padding-bottom: 10px; letter-spacing: .06em; }
+.hr { height: 2px; background: var(--line-soft); margin: 4px 0 16px; }
+.switch { display: flex; align-items: center; justify-content: space-between; padding: 9px 0; }
+.switch .lb { font-size: 12.5px; }
+.savebar {
+  display: flex; align-items: center; gap: 12px; padding: 12px 16px;
+  border: 2px solid var(--line); background: var(--surface-2);
+  position: sticky; bottom: 0; box-shadow: var(--shadow);
+}
+.savebar .grow { flex: 1; }
+.restart-note { color: var(--warn); font-size: 12px; }
+
+/* ── 弹层 ─────────────────────────────────────────────────────────── */
+/* 遮罩用点阵而非模糊：像素风里模糊是脏的，网点才是本体 */
+.veil {
+  position: fixed; inset: 0; display: none; z-index: var(--z-veil);
+  background-color: rgba(4,7,12,.74);
+  background-image: repeating-linear-gradient(45deg, rgba(0,0,0,.35) 0 2px, transparent 2px 4px);
+}
+.veil.on { display: flex; align-items: center; justify-content: center; padding: 20px; }
+.dlg {
+  background: var(--surface); border: 2px solid var(--accent);
+  width: 560px; max-width: 100%; max-height: 86vh; display: flex; flex-direction: column;
+  box-shadow: var(--shadow-lg);
+}
+.dlg header { padding: 15px 18px 12px; border-bottom: 2px solid var(--line); background: var(--surface-2); }
+.dlg header h3 { font-size: 13.5px; font-weight: 700; letter-spacing: .06em; display: flex; align-items: center; gap: 8px; }
+.dlg header h3::before {
+  content: ""; width: 8px; height: 8px; flex: none; background: var(--accent);
+  clip-path: polygon(0 0, 100% 0, 100% 55%, 55% 55%, 55% 100%, 0 100%);
+}
+.dlg header .hint { color: var(--ink-3); font-size: 11.5px; margin-top: 5px; }
+.dlg .body { padding: 16px 18px; overflow: auto; }
+.dlg footer { padding: 12px 18px; border-top: 2px solid var(--line); display: flex; gap: 9px; background: var(--surface-2); }
+.dlg footer .grow { flex: 1; }
+.url {
+  background: var(--bg); border: 2px solid var(--line);
+  padding: 11px 12px; font: 11.5px var(--mono); word-break: break-all; color: var(--accent);
+  margin: 8px 0 12px; user-select: all; box-shadow: inset 2px 2px 0 0 var(--inset);
+}
+.state { font-size: 12.5px; color: var(--ink-2); display: flex; align-items: center; gap: 8px; }
+.state.ok { color: var(--ok); } .state.err { color: var(--bad); }
+/* 光标式省略号：终端里等待就是这样闪的 */
+.dots::after { content: "▊"; color: var(--accent); margin-left: 4px; animation: blink 1s steps(2) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+
+/* ── Toast ───────────────────────────────────────────────────────── */
+#toasts { position: fixed; right: 20px; bottom: 20px; z-index: var(--z-toast); display: flex; flex-direction: column; gap: 8px; align-items: flex-end; }
+.tst {
+  background: var(--raise); border: 2px solid var(--line); border-left: 4px solid var(--ink-3);
+  padding: 10px 14px; font-size: 12.5px; box-shadow: var(--shadow); max-width: 380px;
+}
+.tst.ok { border-left-color: var(--ok); } .tst.err { border-left-color: var(--bad); }
+
+@media (max-width: 760px) {
+  .shell { grid-template-columns: 1fr; }
+  .nav { position: static; height: auto; flex-direction: row; align-items: center; overflow-x: auto; border-right: none; border-bottom: 2px solid var(--line); }
+  .nav ul { display: flex; padding: 8px; } .nav .sig { border: none; }
+  .stat { border-right: none; border-bottom: 1px solid var(--line-soft); }
+}
+</style>
+</head>
+<body>
+<div class="shell">
+  <nav class="nav">
+    <div class="brand">
+      <div class="name">
+        <!-- 像素 Buddy 猫头：16×16 网格，16 个 rect 拼出双耳方脸 + 挖空双眼 + 鼻 -->
+        <svg class="logo" viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="1" width="2" height="1"/><rect x="11" y="1" width="2" height="1"/><rect x="2" y="2" width="4" height="1"/><rect x="10" y="2" width="4" height="1"/><rect x="2" y="3" width="12" height="1"/><rect x="1" y="4" width="14" height="3"/><rect x="1" y="7" width="3" height="2"/><rect x="6" y="7" width="4" height="2"/><rect x="12" y="7" width="3" height="2"/><rect x="1" y="9" width="14" height="1"/><rect x="1" y="10" width="6" height="1"/><rect x="9" y="10" width="6" height="1"/><rect x="1" y="11" width="14" height="1"/><rect x="2" y="12" width="12" height="1"/><rect x="3" y="13" width="10" height="1"/><rect x="4" y="14" width="8" height="1"/></svg>
+        workbuddy-free
+      </div>
+      <div class="sub" id="navSub">控制台</div>
+    </div>
+    <ul>
+      <li><a href="#accounts" data-view="accounts" class="on">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="5.5" r="2.6"/><path d="M2.8 13.5c.6-2.6 2.7-4 5.2-4s4.6 1.4 5.2 4"/></svg>
+        账号池</a></li>
+      <li><a href="#stats" data-view="stats">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2 13.5h12"/><path d="M4.2 13.5V8.6M8 13.5V4.2M11.8 13.5V6.8"/></svg>
+        用量统计</a></li>
+      <li><a href="#taskscenter" data-view="taskscenter">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M3 2.5h10v9H8l-3 3v-3H3z"/><path d="M6 6.5h4M6 9h2.5"/></svg>
+        任务中心</a></li>
+      <li><a href="#models" data-view="models">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M8 1.8 14 5v6L8 14.2 2 11V5z"/><path d="M2 5l6 3.2L14 5M8 8.2v6"/></svg>
+        模型与档位</a></li>
+      <li><a href="#config" data-view="config">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="2.2"/><path d="M8 1.6v1.9M8 12.5v1.9M1.6 8h1.9M12.5 8h1.9M3.5 3.5l1.3 1.3M11.2 11.2l1.3 1.3M12.5 3.5l-1.3 1.3M4.8 11.2l-1.3 1.3"/></svg>
+        配置</a></li>
+      <li><a href="#logs" data-view="logs">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2.5 3.5h11M2.5 8h11M2.5 12.5h7"/></svg>
+        运行日志</a></li>
+    </ul>
+    <div class="sig">
+      <div class="row"><span class="pulse" id="navPulse"></span><span id="navState">连接中</span></div>
+      <div class="row" style="margin-top:5px"><span id="navVer">v-</span> · <span id="navRedis">-</span></div>
+      <div class="row credit">Patrick优化</div>
+    </div>
+  </nav>
+
+  <div class="main">
+    <div class="topbar">
+      <h2 id="ttl">账号池</h2>
+      <span class="sep">/</span>
+      <span class="meta" id="subMeta">-</span>
+      <div class="grow"></div>
+      <button class="icon ghost" id="btnTheme" title="切换明暗（跟随系统 → 浅色 → 深色）" aria-label="切换主题">
+        <svg id="icoTheme" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M13.2 9.6A5.6 5.6 0 0 1 6.4 2.8a5.6 5.6 0 1 0 6.8 6.8z"/></svg>
+      </button>
+      <button id="btnRefresh">刷新</button>
+      <button class="primary" id="btnAdd">添加账号</button>
+    </div>
+
+    <!-- 账号池 -->
+    <section class="view" id="view-accounts">
+      <div class="stats">
+        <div class="stat"><div class="v" id="sTotal">-</div><div class="k">账号总数</div></div>
+        <div class="stat good"><div class="v" id="sHealthy">-</div><div class="k">可用</div></div>
+        <div class="stat warn"><div class="v" id="sCooling">-</div><div class="k">冷却中</div></div>
+        <div class="stat bad"><div class="v" id="sDisabled">-</div><div class="k">已禁用</div></div>
+        <div class="stat"><div class="v" id="sCredits">-</div><div class="k">积分剩余 / 总额</div></div>
+        <div class="stat"><div class="v" id="sSticky">-</div><div class="k">粘性会话</div></div>
+      </div>
+
+      <div class="box">
+        <header>
+          <h3>账号池</h3>
+          <span class="grow"></span>
+          <span class="note" id="accNote"></span>
+          <button class="xs" id="btnCheckinAll">全部签到</button>
+          <button class="xs" id="btnTravelAll">旅行巡检</button>
+          <button class="xs" id="btnActivityAll">活跃上报</button>
+          <button class="xs" id="btnKeepaliveAll">全部保活</button>
+        </header>
+        <div class="tbl-wrap">
+        <table class="acc">
+          <thead><tr>
+            <th class="mark" aria-hidden="true"></th>
+            <th>账号</th><th>状态</th><th>积分</th>
+            <th>成功 / 失败</th><th>在途</th><th>用量</th><th>最近成功</th><th class="c-acts"></th>
+          </tr></thead>
+          <tbody id="accBody"></tbody>
+        </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- 用量统计 -->
+    <section class="view" id="view-stats" hidden>
+      <!-- 累计头条。口径是"自统计启用起"，与下方时间序列同一个聚合器，故上下永远自洽；
+           池的历史总账（统计功能上线之前，只有总数没有按日明细）降级在脚注里作参照。 -->
+      <div class="hero">
+        <div class="top">
+          <div class="big"><b id="ltTotal">-</b><i>tok</i><span class="lb">自统计启用起</span></div>
+          <div class="side">
+            <div><div class="v" id="ltPrompt">-</div><div class="k">输入 TOKEN</div></div>
+            <div><div class="v" id="ltCompletion">-</div><div class="k">输出 TOKEN</div></div>
+            <div><div class="v" id="ltRequests">-</div><div class="k">请求次数</div></div>
+            <div><div class="v" id="ltAccounts">-</div><div class="k">活跃账号</div></div>
+          </div>
+        </div>
+        <div class="foot" id="ltFoot">自账号首次请求起累计，不随统计保留窗口缩减</div>
+      </div>
+
+      <div class="rngrow">
+        <span class="chips" id="rngChips">
+          <button class="xs chip" data-rng="today">今日</button>
+          <button class="xs chip" data-rng="7d">近 7 天</button>
+          <button class="xs chip on" data-rng="30d">近 30 天</button>
+        </span>
+        <span class="note" id="rngNote"></span>
+      </div>
+
+      <div class="stats">
+        <div class="stat"><div class="v" id="stTotal">-</div><div class="k">区间 TOKEN</div></div>
+        <div class="stat"><div class="v" id="stPrompt">-</div><div class="k">输入 TOKEN</div></div>
+        <div class="stat"><div class="v" id="stCompletion">-</div><div class="k">输出 TOKEN</div></div>
+        <div class="stat"><div class="v" id="stRequests">-</div><div class="k">请求次数</div></div>
+        <div class="stat" id="stFailCell"><div class="v" id="stFailed">-</div><div class="k" id="stFailK">失败</div></div>
+        <div class="stat good"><div class="v" id="stRate">-</div><div class="k">平均速率</div></div>
+      </div>
+
+      <div class="box">
+        <header>
+          <h3>消费节律</h3>
+          <span class="grow"></span>
+          <span class="readout" id="chartReadout">—</span>
+        </header>
+        <div class="chart">
+          <div class="plot" id="chartPlot"></div>
+          <div class="strip" id="chartStrip"></div>
+          <div class="scale" id="chartScale"></div>
+          <div class="legend">
+            <span class="lg-tok"><i></i>token 用量</span>
+            <span class="lg-req"><i></i>请求次数</span>
+            <span class="grow" style="flex:1"></span>
+            <span id="chartUnit">按自然日（CST）</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="duo">
+        <div class="box">
+          <header><h3>模型分布</h3><span class="grow"></span><span class="note" id="mdStatNote"></span></header>
+          <div class="tbl-wrap">
+            <table class="acc md">
+              <thead><tr><th class="mark" aria-hidden="true"></th><th>模型</th><th>TOKEN</th><th>占比</th><th>请求</th><th>输入 / 输出</th></tr></thead>
+              <tbody id="mdStatBody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="box">
+          <header><h3>账号用量</h3><span class="grow"></span><span class="note" id="acStatNote"></span></header>
+          <div class="tbl-wrap">
+            <table class="acc md">
+              <thead><tr><th class="mark" aria-hidden="true"></th><th>账号</th><th>TOKEN</th><th>占比</th><th>请求</th><th>失败</th></tr></thead>
+              <tbody id="acStatBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 任务中心 -->
+    <section class="view" id="view-taskscenter" hidden>
+      <div class="box">
+        <header>
+          <h3>开学季 <span class="hint">09-13 ~ 09-24 · 每日重置</span></h3>
+          <span class="grow"></span>
+          <span class="note" id="schoolSummary"></span>
+          <button class="xs" id="btnSchoolRefresh">刷新</button>
+          <button class="xs primary" id="btnSchoolRunAll">全部账号执行闭环</button>
+        </header>
+        <div class="state" id="schoolState"><span class="dots">加载中</span></div>
+        <div id="schoolList"></div>
+      </div>
+
+      <div class="box">
+        <header>
+          <h3>成长任务队列 <span class="hint" id="qcSummary"></span></h3>
+          <span class="grow"></span>
+          <label class="sel-note">并发
+            <select id="qcConc"><option value="1" selected>1</option><option value="2">2</option><option value="3">3</option></select>
+          </label>
+          <button class="xs" id="btnScanAll">扫描待办</button>
+          <button class="xs primary" id="btnRunQueue">执行全部待办</button>
+        </header>
+        <div class="qprog" id="qProg" hidden>
+          <div class="qbar"><i id="qBarFill"></i></div>
+          <span class="note" id="qProgText"></span>
+        </div>
+        <div class="tc-empty" id="tcEmpty">
+          <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <rect x="8" y="6" width="24" height="36" rx="3"/>
+            <path d="M14 16h12M14 24h12M14 32h7" opacity=".45"/>
+            <circle cx="35" cy="33" r="8"/><path d="m40 38 5 5"/>
+          </svg>
+          <div class="t">还没有扫描过</div>
+          <div class="d">扫描所有账号的成长任务与开学季待办，把没做的排成一列，一键执行。</div>
+        </div>
+        <div id="qcList"></div>
+      </div>
+    </section>
+
+    <!-- 模型与档位 -->
+    <section class="view" id="view-models" hidden>
+      <div class="box">
+        <header>
+          <h3>模型能力</h3>
+          <span class="grow"></span>
+          <span class="note" id="mdNote">实时查询上游</span>
+          <button class="xs" id="btnModels">重新获取</button>
+        </header>
+        <div class="tbl-wrap">
+        <table class="acc md">
+          <thead><tr><th class="mark" aria-hidden="true"></th><th>模型</th><th>积分倍率</th><th>默认档</th><th>支持的思考档位</th><th>上下文长度</th><th>最大输出</th></tr></thead>
+          <tbody id="mdBody"></tbody>
+        </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- 配置 -->
+    <section class="view" id="view-config" hidden>
+      <form id="cfgForm">
+        <div class="box">
+          <header><h3>服务</h3><span class="grow"></span><span class="note" id="cfgPath"></span></header>
+          <div class="pad">
+            <div class="grid2">
+              <label class="fld"><span class="lb">监听地址</span>
+                <input name="listen" placeholder=":7863">
+                <span class="hint">改动需重启进程</span></label>
+              <label class="fld"><span class="lb">API 密钥</span>
+                <div class="inline"><input name="api_key" id="cfgKey" type="password" placeholder="留空 = 不鉴权">
+                <button type="button" class="xs" id="btnEye">显示</button></div>
+                <span class="hint">立即生效（含面板自身）</span></label>
+            </div>
+          </div>
+        </div>
+
+        <div class="box">
+          <header><h3>定时任务</h3></header>
+          <div class="pad">
+            <div class="grid2">
+              <div>
+                <div class="switch"><span class="lb">自动签到</span>
+                  <input type="checkbox" name="checkin_enabled"></div>
+                <label class="fld"><span class="lb">签到时点（小时，逗号分隔）</span>
+                  <input name="checkin_hours" placeholder="9, 21"></label>
+              </div>
+              <div>
+                <div class="switch"><span class="lb">Token 保活</span>
+                  <input type="checkbox" name="keepalive_enabled"></div>
+                <label class="fld"><span class="lb">保活时点（小时，逗号分隔）</span>
+                  <input name="keepalive_hours" placeholder="22"></label>
+              </div>
+            </div>
+            <div class="hr"></div>
+            <div class="grid2">
+              <div>
+                <div class="switch"><span class="lb">猫猫旅行</span>
+                  <input type="checkbox" name="travel_enabled"></div>
+                <label class="fld"><span class="lb">旅行时点（小时，逗号分隔）</span>
+                  <input name="travel_hours" placeholder="9, 21">
+                  <span class="hint">一趟派出 + 一趟领奖闭环</span></label>
+              </div>
+              <div>
+                <div class="switch"><span class="lb">活跃上报</span>
+                  <input type="checkbox" name="activity_enabled"></div>
+                <label class="fld"><span class="lb">上报时点（小时，逗号分隔）</span>
+                  <input name="activity_hours" placeholder="10">
+                  <span class="hint">点亮连登 + 解锁领养前置</span></label>
+              </div>
+            </div>
+            <div class="hr"></div>
+            <div class="grid2">
+              <div class="switch"><span class="lb">后台刷新余额</span>
+                <input type="checkbox" name="balance_refresh_enabled"></div>
+              <label class="fld"><span class="lb">刷新间隔（分钟）</span>
+                <input name="balance_refresh_minutes" type="number" min="1" placeholder="5"></label>
+            </div>
+          </div>
+        </div>
+
+        <div class="box">
+          <header><h3>账号池与流量治理</h3></header>
+          <div class="pad">
+            <div class="grid3">
+              <label class="fld"><span class="lb">单账号最大在途</span>
+                <input name="max_in_flight" type="number" min="0" placeholder="3">
+                <span class="hint">0 = 不限制</span></label>
+              <label class="fld"><span class="lb">连续失败熔断阈值</span>
+                <input name="breaker_threshold" type="number" min="1" placeholder="3"></label>
+              <label class="fld"><span class="lb">软限流冷却基数</span>
+                <input name="soft_rate" placeholder="600s"></label>
+            </div>
+            <div class="grid3">
+              <label class="fld"><span class="lb">软冷却退避上限</span>
+                <input name="soft_rate_max" placeholder="2h"></label>
+              <label class="fld"><span class="lb">熔断基础时长</span>
+                <input name="breaker_cooldown" placeholder="30m"></label>
+              <label class="fld"><span class="lb">熔断退避上限</span>
+                <input name="breaker_cooldown_max" placeholder="6h"></label>
+            </div>
+            <div class="grid3">
+              <label class="fld"><span class="lb">闲置补偿 / 小时</span>
+                <input name="idle_weight_per_hour" type="number" step="0.1" placeholder="0.5"></label>
+              <label class="fld"><span class="lb">闲置补偿上限</span>
+                <input name="idle_weight_max" type="number" step="0.1" placeholder="5"></label>
+              <label class="fld"><span class="lb">会话粘性 TTL</span>
+                <input name="ttl" placeholder="30m">
+                <span class="hint">改动需重启进程</span></label>
+            </div>
+          </div>
+        </div>
+
+        <div class="box">
+          <header><h3>上游与高级</h3></header>
+          <div class="pad">
+            <div class="grid3">
+              <label class="fld"><span class="lb">短请求超时</span>
+                <input name="timeout_seconds" type="number" min="1" placeholder="120">
+                <span class="hint">需重启</span></label>
+              <label class="fld"><span class="lb">聊天首字节超时</span>
+                <input name="header_timeout_seconds" type="number" min="1" placeholder="120">
+                <span class="hint">需重启</span></label>
+              <label class="fld"><span class="lb">流空闲超时</span>
+                <input name="idle_timeout_seconds" type="number" min="1" placeholder="300">
+                <span class="hint">需重启</span></label>
+            </div>
+            <div class="hr"></div>
+            <div class="grid2">
+              <label class="fld"><span class="lb">请求体上限（MB）</span>
+                <input name="max_body_mb" type="number" min="1" placeholder="8">
+                <span class="hint">多图会话可调大；需重启</span></label>
+              <label class="fld"><span class="lb">出站 User-Agent</span>
+                <input name="user_agent" placeholder="留空 = CLI/2.63.2 CodeBuddy/2.63.2">
+                <span class="hint">影响官网积分记录「使用端」显示；需重启</span></label>
+            </div>
+            <div class="hr"></div>
+            <div class="grid2">
+              <label class="fld"><span class="lb">系统提示词模式</span>
+                <select name="prompt_mode">
+                  <option value="custom">custom — 网关自有提示词（避免指纹误报）</option>
+                  <option value="passthrough">passthrough — 透传客户端原始 system</option>
+                </select>
+                <span class="hint">需重启</span></label>
+              <label class="fld"><span class="lb">提示词文件路径</span>
+                <input name="prompt_file" placeholder="留空 = 内置默认提示词">
+                <span class="hint">需重启</span></label>
+            </div>
+            <div class="hr"></div>
+            <div class="switch"><span class="lb">出站请求指纹脱敏</span>
+              <input type="checkbox" name="sanitize_blacklist_fingerprints"></div>
+            <div class="switch"><span class="lb">会话粘性路由</span>
+              <input type="checkbox" name="session_sticky_enabled"></div>
+            <div class="hr"></div>
+            <div class="grid2">
+              <div class="switch"><span class="lb">按天用量统计</span>
+                <input type="checkbox" name="stats_enabled"></div>
+              <label class="fld"><span class="lb">统计保留天数</span>
+                <input name="stats_keep_days" type="number" min="1" placeholder="30">
+                <span class="hint">改动需重启进程</span></label>
+            </div>
+            <div class="hint" style="margin-top:10px">统计按自然日聚合并落盘，供「用量统计」页出趋势与排行；落盘路径默认与状态文件同目录（手工编辑配置文件可改）。</div>
+          </div>
+        </div>
+
+        <div class="savebar">
+          <span class="grow"></span>
+          <span class="restart-note" id="cfgNote"></span>
+          <button type="button" id="btnCfgReload">放弃修改</button>
+          <button type="submit" class="primary" id="btnCfgSave">保存配置</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- 日志 -->
+    <section class="view" id="view-logs" hidden>
+      <div class="box">
+        <header>
+          <h3>运行日志</h3>
+          <span class="grow"></span>
+          <span class="chips" id="logChips">
+            <button class="xs chip on" data-ch="all">全部</button>
+            <button class="xs chip" data-ch="task">任务</button>
+            <button class="xs chip" data-ch="chat">对话</button>
+            <button class="xs chip" data-ch="sys">系统</button>
+          </span>
+          <span class="note" id="logNote">最近 500 行</span>
+          <button class="xs" id="btnLogPin">自动滚动：开</button>
+        </header>
+        <pre id="logBox"></pre>
+      </div>
+    </section>
+  </div>
+</div>
+
+<!-- 积分任务 -->
+<div class="veil" id="taskVeil">
+  <div class="dlg" style="width:940px">
+    <header>
+      <h3>积分任务 <span class="hint" id="taskWho"></span></h3>
+      <div class="hint">查询上游任务进度；「接受」为报名（幂等），「领取」在进度达标后可用。所有操作走网关，无需外部脚本。</div>
+    </header>
+    <div class="body">
+      <div class="state" id="taskState"><span class="dots">加载中</span></div>
+      <div class="tbl-wrap">
+        <table class="acc md" id="taskTable" hidden>
+          <thead><tr><th class="mark" aria-hidden="true"></th><th>任务</th><th>进度</th><th>奖励</th><th>状态</th><th class="c-acts"></th></tr></thead>
+          <tbody id="taskBody"></tbody>
+        </table>
+      </div>
+    </div>
+    <footer>
+      <span class="grow"></span>
+      <button id="btnTaskAcceptAll">全部接受</button>
+      <button id="btnTaskAutoAll" class="primary">一键完成可自动任务</button>
+      <button id="btnTaskReload">重新查询</button>
+      <button id="btnCloseTask">关闭</button>
+    </footer>
+  </div>
+</div>
+
+<!-- 添加账号 -->
+<div class="veil" id="addVeil">
+  <div class="dlg">
+    <header>
+      <h3>添加账号</h3>
+      <div class="hint">浏览器完成腾讯账号登录，网关自动接续签到并载入账号池，无需重启。</div>
+    </header>
+    <div class="body">
+      <div id="addPick">
+        <div class="realm-row">
+          <span class="hint" style="font-size:12px">版本：</span>
+          <label class="realm-opt"><input type="radio" name="addRealm" value="cn" checked> 国内版（CN）</label>
+          <label class="realm-opt"><input type="radio" name="addRealm" value="global"> 国际版（Global）</label>
+        </div>
+        <div class="hint" style="font-size:12px;margin-top:2px">国际版登录后，网关自动完成注册地区、激活与试用额度领取，全程无需手动操作。</div>
+      </div>
+      <div id="addLoad" class="state" hidden><span class="dots">正在获取授权链接</span></div>
+      <div id="addReady" hidden>
+        <div class="state">在浏览器打开以下链接并登录：</div>
+        <div class="url" id="addUrl"></div>
+        <div class="state" id="addPoll"><span class="dots">等待授权完成，自动检测中</span></div>
+      </div>
+      <div id="addDone" class="state ok" hidden></div>
+      <div id="addErr" class="state err" hidden></div>
+    </div>
+    <footer>
+      <span class="grow"></span>
+      <button id="btnStartLogin" class="primary">获取授权链接</button>
+      <button id="btnCopyUrl" hidden>复制链接</button>
+      <button id="btnOpenUrl" class="primary" hidden>在浏览器打开</button>
+      <button id="btnCloseAdd">关闭</button>
+    </footer>
+  </div>
+</div>
+
+<!-- 密钥 -->
+<div class="veil" id="keyVeil" data-lock="1">
+  <div class="dlg" style="width:420px">
+    <header>
+      <h3>需要访问密钥</h3>
+      <div class="hint">该网关已启用 api_key 鉴权，请输入 config.json 中的密钥。</div>
+    </header>
+    <div class="body">
+      <input type="password" id="keyInput" placeholder="api_key" autocomplete="current-password">
+      <div class="state err" id="keyErr" hidden style="margin-top:10px">密钥不正确，请重试。</div>
+    </div>
+    <footer>
+      <span class="grow"></span>
+      <button class="primary" id="btnKey">进入</button>
+    </footer>
+  </div>
+</div>
+
+<div id="toasts"></div>
+
+<script src="app.js"></script>
+</body>
+</html>

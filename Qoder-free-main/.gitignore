@@ -1,0 +1,6 @@
+config.json
+data/
+bin/
+logs/
+*.exe
+worker/node_modules/

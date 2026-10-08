@@ -1,0 +1,42 @@
+{
+  "name": "cmdgo-bridge",
+  "version": "0.1.0",
+  "description": "CommandCode Go 套餐独立桥接服务：/alpha/generate CLI 网关 → OpenAI 兼容 API，含 OAuth 登录与多账号池，附自带控制台页面",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "cmdgo-bridge": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "public",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "start": "node dist/index.js",
+    "mock": "node scripts/mock-gateway.mjs"
+  },
+  "engines": {
+    "node": ">=20.3.0"
+  },
+  "keywords": [
+    "commandcode",
+    "commandcode-go",
+    "cmdgo",
+    "openai-compatible",
+    "llm-provider",
+    "bridge",
+    "proxy"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Patrick-mufeng/cmdgo-bridge.git"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.1",
+    "typescript": "^5.9.0"
+  }
+}

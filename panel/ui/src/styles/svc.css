@@ -1,0 +1,147 @@
+/* ============================================================
+   服务详情页精致化样式（全走 tokens 变量，三主题自适应）
+   ============================================================ */
+
+/* ---------- 页头 ---------- */
+/* 容器是中性白底 + 细环：让各家官方 logo 自己的品牌色说话。
+   （彩色渐变底会和 logo 抢色，比如 workbuddy 的青绿渐变标压在绿色渐变上就糊了） */
+.svc-ava {
+  width: 40px; height: 40px; border-radius: 13px; flex: none;
+  display: grid; place-items: center; overflow: hidden; background: #fff;
+  box-shadow: 0 1px 3px rgba(20, 24, 32, 0.16), inset 0 0 0 1px rgba(20, 24, 32, 0.07);
+}
+.pagehead .acts { display: flex; align-items: center; gap: 10px; }
+
+/* ---------- 统计条 ---------- */
+.stat6 .kpi .v { font-size: 24px; }
+.stat4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--grid-gap); margin-bottom: var(--sect-gap); }
+@media (max-width: 1100px) { .stat6 { grid-template-columns: repeat(3, 1fr); } .stat4 { grid-template-columns: repeat(2, 1fr); } }
+
+/* ---------- 批量操作栏 ---------- */
+.opsbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.opsbar .lbl { font-size: 12.5px; color: var(--muted); margin-right: 4px; font-weight: 600; }
+
+/* ---------- 账号表 ---------- */
+.tbox table tbody tr { transition: background 0.15s ease-out; }
+.tbox table tbody tr:hover { background: var(--accent-soft); }
+.u-name { display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 650; flex-wrap: wrap; }
+.u-sub { font-size: 11px; color: var(--faint); font-family: var(--font-mono); margin-top: 1px; }
+td.ops { white-space: nowrap; }
+td.ops .btn.xs { margin-left: 4px; }
+
+/* ---------- 任务中心 ---------- */
+.slot { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-family: var(--font-mono); }
+.slot .s { font-size: 11px; }
+.slot.done { color: var(--ok); }
+.slot.avail { color: var(--warn); }
+.slot.part { color: var(--warn); }
+.slot.todo { color: var(--faint); }
+.slot.skip { color: var(--faint); opacity: 0.75; }
+.q-head {
+  display: grid; grid-template-columns: 130px 1fr 80px 90px minmax(140px, 260px);
+  gap: 10px; padding: 12px 2px 6px; color: var(--faint); font-size: 10.5px;
+  letter-spacing: 0.04em; border-top: 1px solid var(--line);
+}
+/* 任务队列用 4 列（账号 / 任务 / 状态 / 消息）：
+   队列项没有 name/progress 字段，沿用待办预览的 5 列会留两列永远填不上。 */
+.q-head.q4,
+.q-row.q4 { grid-template-columns: 190px minmax(0, 1fr) 90px minmax(0, 1.4fr); }
+.q-row.q4 .chip { margin-left: 8px; }
+
+.q-row {
+  display: grid; grid-template-columns: 130px 1fr 80px 90px minmax(140px, 260px);
+  gap: 10px; padding: 9px 2px; border-top: 1px solid var(--line-soft);
+  font-size: 12.5px; align-items: center;
+}
+.q-group { padding: 14px 2px 6px; color: var(--text); font-weight: 650; font-size: 12.5px; border-top: 1px solid var(--line); }
+.sq { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+
+/* ---------- 对话测试 ---------- */
+.chat-grid { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(260px, 1fr); gap: var(--grid-gap); align-items: start; }
+.chat-thread {
+  border: 1px solid var(--line); border-radius: 14px; background: var(--toast-bg);
+  min-height: 260px; max-height: 430px; overflow: auto; padding: 14px 16px;
+}
+.bub { display: flex; gap: 10px; margin-bottom: 14px; }
+.bub .av {
+  width: 26px; height: 26px; border-radius: 9px; flex: none;
+  display: grid; place-items: center; font-size: 11px; font-weight: 700;
+  background: var(--accent-soft); color: var(--muted);
+}
+.bub.ai .av { background: var(--ok-soft); color: var(--ok); }
+.bub .bd { flex: 1; min-width: 0; }
+.bub .txt { font-size: 13px; white-space: pre-wrap; word-break: break-word; }
+.bub .think {
+  border: 1px dashed var(--line); border-radius: 9px; padding: 5px 9px;
+  font-size: 12px; color: var(--muted); margin: 5px 0; cursor: default;
+}
+.bub .stats { font-size: 11px; color: var(--faint); font-family: var(--font-mono); margin-top: 5px; }
+
+/* ---------- 模型库 ---------- */
+.grp-h { display: flex; align-items: center; gap: 10px; padding: 12px 2px; border-top: 1px solid var(--line); flex-wrap: wrap; }
+.grp-h .gdot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--accent); }
+.grp-h .sp { flex: 1; }
+.librow { display: flex; align-items: center; gap: 10px; padding: 9px 2px; border-top: 1px solid var(--line-soft); flex-wrap: wrap; }
+.librow .mid { font-family: var(--font-mono); font-size: 12px; color: var(--text); }
+.librow .sp { flex: 1; min-width: 40px; }
+.facts { margin: 0; padding-left: 18px; font-size: 12.5px; color: var(--muted); line-height: 1.9; }
+
+/* ---------- 双栏 ---------- */
+.stats-duo { display: grid; grid-template-columns: 1fr 1.5fr; gap: var(--grid-gap); align-items: start; }
+
+/* ---------- 响应式 ---------- */
+@media (max-width: 1100px) {
+  .chat-grid { grid-template-columns: 1fr; }
+  .stats-duo { grid-template-columns: 1fr; }
+  .q-head, .q-row { grid-template-columns: 100px 1fr 70px 80px minmax(100px, 1fr); }
+  .q-head.q4, .q-row.q4 { grid-template-columns: 120px minmax(0, 1fr) 72px minmax(0, 1fr); }
+  .stats-duo { grid-template-columns: 1fr !important; }
+}
+
+/* ---------- 接入页签（连接信息 / 代码片段 / 自检） ---------- */
+.acc-hint {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin-bottom: var(--sect-gap); padding: 10px 14px; font-size: 12.5px; color: var(--muted);
+  background: var(--line-soft); border: 1px solid var(--line); border-radius: 12px;
+}
+.acc-rows { display: flex; flex-direction: column; gap: 14px; }
+.acc-rows > div { display: flex; gap: 14px; align-items: flex-start; }
+.acc-rows dt { flex: none; width: 62px; padding-top: 4px; font-size: 12px; color: var(--muted); font-weight: 600; }
+.acc-rows dd { margin: 0; min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 7px; }
+.acc-url { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.acc-url code {
+  font-family: var(--font-mono); font-size: 12.5px;
+  background: var(--line-soft); border: 1px solid var(--line); border-radius: 9px;
+  padding: 6px 10px; min-width: 0; overflow: auto; white-space: nowrap; user-select: all;
+}
+.acc-snip { max-height: 320px; line-height: 1.75; }
+.acc-actions { display: flex; align-items: center; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+.acc-probe { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.acc-probe.bad { color: var(--bad); }
+.acc-notes { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 7px; font-size: 12.5px; color: var(--muted); }
+.acc-notes li::marker { color: var(--faint); }
+@media (max-width: 900px) {
+  .acc-rows > div { flex-direction: column; gap: 6px; }
+  .acc-rows dt { width: auto; padding-top: 0; }
+}
+
+.acc-inline { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
+
+/* ---------- 设置页：分组字段网格 ---------- */
+/* 字段列宽固定上限，不跟着容器拉伸——表单不需要铺满 1440px */
+.cfggrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 300px)); justify-content: start; gap: 15px 22px; }
+.cfgitem { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.cfgitem.wide { grid-column: 1 / -1; }
+.cfgitem.wide textarea { max-width: 660px; }
+.cfgitem .lb { font-size: 12px; font-weight: 600; }
+.cfgitem .hint { font-size: 11px; color: var(--faint); line-height: 1.5; }
+.cfgitem input, .cfgitem select, .cfgitem textarea { width: 100%; }
+.cfgitem textarea { font-family: var(--font-mono); font-size: 12px; }
+.cfgrow { display: flex; align-items: center; gap: 10px; min-height: 34px; }
+.cfgrow .lb { flex: 1; }
+.cfg-save { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+/* ---------- 自定义请求头（cline） ---------- */
+.hdrrows { display: flex; flex-direction: column; gap: 8px; }
+.hdrrow { display: grid; grid-template-columns: minmax(150px, 230px) minmax(0, 380px) auto; justify-content: start; gap: 8px; align-items: center; }
+@media (max-width: 900px) { .hdrrow { grid-template-columns: 1fr; } }

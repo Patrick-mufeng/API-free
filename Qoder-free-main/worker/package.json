@@ -1,0 +1,16 @@
+{
+  "name": "qoder-account-daemon",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
+    "@qoder-ai/qodercli": "1.1.32",
+    "@qodercn-ai/qoderclicn": "1.1.32",
+    "undici": "6.21.2"
+  },
+  "type": "module",
+  "description": "Qoder one-account daemon for qoder-api-proxy",
+  "scripts": {
+    "start": "node src/daemon.mjs",
+    "test": "node --test test/*.test.mjs"
+  }
+}

@@ -1,0 +1,58 @@
+# ============================================================
+#  密钥：一律本地生成，仓库只保留 *.example
+#  下面三个文件里是真实 API key（提交前用「真钥反查全树」验证过：
+#  除它们自己之外，另有 panel/data/logs/*.log 也含明文密钥）。
+# ============================================================
+/workbuddy-free-main/config.json
+/Qoder-free-main/config.json
+/cline-free-main/.env.local
+
+# 通用兜底：任何位置的 env 文件都不入库，但保留 example
+**/.env
+**/.env.local
+**/.env.*.local
+!**/*.example
+!**/*.example.json
+
+# ============================================================
+#  运行时状态与日志
+#  注意：不要只排 *.log —— panel/data/logs/ 里实测含有四个服务的
+#  明文凭据与会话信息，整个 data/ 必须排除。
+#
+#  坑（曾误伤）：裸写 `data/` 会匹配任意层级，把前端源码目录
+#  `panel/ui/src/data/` 一起排掉（里面是 format.ts / services.ts，
+#  被 8 处 import 引用）→ 新克隆的仓库 npm run build 必然失败。
+#  兜底规则要留，但下一行的 ! 放行不能删。
+# ============================================================
+/panel/data/
+/Qoder-free-main/data/
+/workbuddy-free-main/data/
+/cline-free-main/data/
+data/
+!panel/ui/src/data/
+*.log
+
+# ============================================================
+#  依赖与构建产物（都可由源码重建）
+#  - panel/bin/panel.exe            → go build -o bin/panel.exe ./cmd/panel
+#  - Qoder-free-main/bin/qoder-free.exe → 该项目自己的 go build
+#  - panel/ui/dist/                 → cd panel/ui && npm run build
+#  - */node_modules/                → npm install
+# ============================================================
+node_modules/
+/panel/bin/
+/panel/ui/dist/
+/cmdgo-bridge-main/dist/
+/Qoder-free-main/bin/
+*.exe
+*.exe~
+*.bak
+*~
+
+# ============================================================
+#  ZCode / 编辑器 / 系统
+# ============================================================
+.zcode/
+.DS_Store
+Thumbs.db
+desktop.ini

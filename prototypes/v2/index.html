@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>API-free 面板重设计 · 5 个方向</title>
+<link rel="stylesheet" href="assets/fonts.css">
+<style>
+/* 选择器本体的设计是中性暗色——它只是个挑选用具，不该跟 5 个方案抢注意力。 */
+:root{
+  --bg:#0A0B0D; --surf:#121417; --surf2:#191C20; --line:#23272C; --line2:#2E333A;
+  --fg:#E6E9EC; --fg2:#B4BBC2; --dim:#7C848C; --dim2:#565D65;
+  --pick:#F0F3F6;
+  --sans:var(--font-sans); --mono:var(--font-mono);
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:400 13px/1.6 var(--sans);
+  -webkit-font-smoothing:antialiased;overflow:hidden}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;padding:0;text-align:left}
+a{color:inherit}
+
+.top{height:56px;display:flex;align-items:center;gap:14px;padding:0 18px;border-bottom:1px solid var(--line);
+  background:var(--surf)}
+.top .mk{display:flex;align-items:center;gap:9px}
+.top .mk svg{width:20px;height:20px;color:var(--fg)}
+.top .mk b{font-size:13.5px;font-weight:600;letter-spacing:-.015em}
+.top .ttl{color:var(--dim);font-size:12px;padding-left:14px;border-left:1px solid var(--line)}
+.top .right{margin-left:auto;display:flex;align-items:center;gap:10px}
+.btn{display:inline-flex;align-items:center;gap:6px;height:29px;padding:0 11px;border:1px solid var(--line2);
+  border-radius:7px;font-size:12px;color:var(--fg2)}
+.btn:hover{background:var(--surf2);color:var(--fg)}
+.btn.pri{background:var(--pick);color:#0A0B0D;border-color:var(--pick);font-weight:500}
+.kbd{font-family:var(--mono);font-size:10px;color:var(--dim);border:1px solid var(--line2);border-radius:4px;
+  padding:1.5px 5px;background:var(--surf2)}
+
+.wrap{display:grid;grid-template-columns:288px 1fr;height:calc(100% - 56px)}
+.list{overflow:auto;border-right:1px solid var(--line);background:var(--surf);padding:10px}
+.item{width:100%;padding:11px 12px;border-radius:9px;margin-bottom:4px;border:1px solid transparent;display:block}
+.item:hover{background:var(--surf2)}
+.item.on{background:var(--surf2);border-color:var(--line2)}
+.item .hd{display:flex;align-items:center;gap:8px}
+.item .no{font-family:var(--mono);font-size:10.5px;color:var(--dim2);width:12px;flex:none}
+.item .nm{font-size:13px;font-weight:500;color:var(--fg2)}
+.item.on .nm{color:var(--fg)}
+.item .tag{margin-left:auto;font-size:10px;color:var(--dim);border:1px solid var(--line2);border-radius:4px;padding:0 5px}
+.item .ds{font-size:11.5px;color:var(--dim);margin-top:4px;line-height:1.6;padding-left:20px}
+.item.on .ds{color:var(--fg2)}
+.notes{margin-top:14px;padding:12px;border-top:1px solid var(--line);font-size:11px;color:var(--dim);line-height:1.7}
+.notes b{color:var(--fg2);font-weight:500}
+
+.stage{position:relative;overflow:hidden;background:#000}
+.stage .frame{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+.stage iframe{width:1500px;height:1000px;border:0;background:#fff;transform-origin:center center;
+  box-shadow:0 24px 70px rgba(0,0,0,.6)}
+.stage .meta{position:absolute;left:0;right:0;bottom:0;display:flex;align-items:center;gap:14px;
+  padding:9px 16px;background:linear-gradient(transparent,rgba(6,7,9,.92));font-size:11.5px;color:var(--dim)}
+.stage .meta b{color:var(--fg2);font-weight:500}
+.stage .meta .sp{margin-left:auto;display:flex;gap:14px;align-items:center}
+</style>
+</head>
+<body>
+<div class="top">
+  <span class="mk"><svg viewBox="0 0 32 32" fill="currentColor" stroke="currentColor" stroke-linejoin="miter" id="mkSvg"></svg>
+    <b>API-free</b></span>
+  <span class="ttl">统一面板 · 前端重设计 · 5 个方向</span>
+  <div class="right">
+    <span style="font-size:11.5px;color:var(--dim);display:flex;align-items:center;gap:10px">
+      <span class="kbd">1-5</span> 切换 <span class="kbd">← →</span> 上一个/下一个 <span class="kbd">O</span> 新标签打开</span>
+    <a class="btn" href="logo.html" target="_blank">看 logo 定稿</a>
+    <button class="btn pri" id="openBtn">在新标签打开当前</button>
+  </div>
+</div>
+<div class="wrap">
+  <div class="list" id="list"></div>
+  <div class="stage" id="stage">
+    <div class="frame" id="frame"></div>
+    <div class="meta" id="meta"></div>
+  </div>
+</div>
+
+<script src="assets/logo-inner.js"></script>
+<script>
+document.getElementById('mkSvg').innerHTML = window.LOGO_INNER;
+
+const DEMOS = [
+  { f:'demo-1-ops.html', nm:'指挥台', tag:'浅色',
+    ds:'精密仪表。无卡片阴影，结构靠细线、网格与字号阶梯；信息密度高，一屏看全。左侧图标栏 + 统计带 + 密集服务表。适合“每天开着扫一眼”的用法。' },
+  { f:'demo-2-workbench.html', nm:'工作台', tag:'深色',
+    ds:'三栏开发工具：服务树 / 主区 / 检查器，键盘优先（Ctrl+K 命令面板、1-5 切视图）。密集表格、等宽数字、行悬停。适合长时间停留着干活。' },
+  { f:'demo-3-analytics.html', nm:'数据台', tag:'浅色',
+    ds:'图表主导。四个服务的身份色贯穿所有图形（KPI 迷你图 / 堆叠面积 / 排行条 / 占比环），颜色本身就是数据模型。适合最关心“用量怎么走的”。' },
+  { f:'demo-4-console.html', nm:'控制台', tag:'深色',
+    ds:'终端原生。直角框线 + 等宽排版 + 字符柱状图，状态用文字而不是色块；只有一枚低饱和玉色做强调。适合本来就在终端里生活的人。' },
+  { f:'demo-5-editorial.html', nm:'素白', tag:'浅色',
+    ds:'排版主导。没有卡片、没有阴影，结构全部来自水平细线与留白；数字用衬线大字，标签用小号大写字母。适合想要“安静、像一份报告”的观感。' },
+];
+
+let cur = 0;
+const stage = document.getElementById('stage');
+const frame = document.getElementById('frame');
+const meta  = document.getElementById('meta');
+
+function fit(){
+  const r = stage.getBoundingClientRect();
+  const s = Math.min((r.width - 56) / 1500, (r.height - 92) / 1000, 1);
+  frame.querySelector('iframe').style.transform = `scale(${s})`;
+}
+function pick(i){
+  cur = (i + DEMOS.length) % DEMOS.length;
+  const d = DEMOS[cur];
+  frame.innerHTML = `<iframe src="${d.f}" title="${d.nm}"></iframe>`;
+  fit();
+  meta.innerHTML = `<b>${cur+1}. ${d.nm}</b><span>${d.tag}</span>
+    <span class="sp"><span>${d.f}</span></span>`;
+  document.querySelectorAll('.item').forEach((el,k)=>el.classList.toggle('on', k===cur));
+}
+document.getElementById('list').innerHTML = DEMOS.map((d,i)=>`
+  <button class="item" data-i="${i}">
+    <span class="hd"><span class="no">${i+1}</span><span class="nm">${d.nm}</span><span class="tag">${d.tag}</span></span>
+    <span class="ds">${d.ds}</span>
+  </button>`).join('') + `
+  <div class="notes">
+    <b>数据</b>：五个 demo 用的是同一份真实快照（取自已运行的面板 API，2026-10-07 17:12），
+    四家的 logo 用的是各自官网的官方图形，字体内嵌（Inter + JetBrains Mono + 中文回落系统字体）。<br><br>
+    <b>关于趋势图</b>：真实数据只有 10-06 起两天有流量，曲线贴零是事实。每个 demo 右上角有「真实 / 示例密度」开关——切到示例才看得到图表在数据密集时的形态，示例态会明确标注为示例。<br><br>
+    <b>内容范围</b>：每个 demo 都实现了总览 / 服务 / 统计 / 日志 / 设置 五个视图，服务页含账号·模型·用量·日志·接入·设置页签，全部接真实字段。
+  </div>`;
+document.querySelectorAll('.item').forEach(el=>el.addEventListener('click',()=>pick(+el.dataset.i)));
+document.getElementById('openBtn').addEventListener('click',()=>window.open(DEMOS[cur].f,'_blank'));
+window.addEventListener('resize', fit);
+document.addEventListener('keydown',(e)=>{
+  if(e.key>='1'&&e.key<='5') pick(+e.key-1);
+  if(e.key==='ArrowRight'||e.key==='ArrowDown') pick(cur+1);
+  if(e.key==='ArrowLeft'||e.key==='ArrowUp') pick(cur-1);
+  if(e.key==='o'||e.key==='O') window.open(DEMOS[cur].f,'_blank');
+});
+pick(0);
+</script>
+</body>
+</html>

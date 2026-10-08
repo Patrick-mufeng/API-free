@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>cmdgo-bridge · API-free</title>
+<link rel="stylesheet" href="theme.css">
+<style>
+  .seclabel{font-size:10.5px;font-weight:700;letter-spacing:.16em;color:var(--faint);margin-bottom:12px}
+  .acctrow{display:flex;align-items:center;gap:10px;padding:11px 2px;border-top:1px solid var(--line-soft)}
+  .acctrow .dot{width:7px;height:7px;border-radius:50%;flex:none}
+  .acctrow .dot.on{background:var(--ok)} .acctrow .dot.wait{background:var(--warn);animation:pulse 1.1s ease-in-out infinite} .acctrow .dot.off{background:#c9c6be}
+  .stat4{display:grid;grid-template-columns:repeat(4,1fr);gap:26px}
+  @media (max-width:900px){.stat4{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="pagehead">
+    <svg width="34" height="34" viewBox="0 0 32 32" style="border:1px solid var(--line);border-radius:11px;background:#fff"><text x="16" y="21.5" text-anchor="middle" font-size="13" font-weight="700" fill="#1c1c1a">Go</text></svg>
+    <div>
+      <h1 style="margin:0;font-size:19px;font-weight:650">cmdgo-bridge</h1>
+      <div class="sub">Node · 端口 11435 · 常驻进程 · 崩溃自动拉起已启用 · 回调依赖本机 5959-5968 端口</div>
+    </div>
+    <span class="st stop" id="svcBadge"><i></i>已停止</span>
+    <span style="flex:1"></span>
+    <button class="btn" id="restartBtn">启动</button>
+    <button class="sw" role="switch" aria-checked="false" aria-label="服务开关" id="svcSwitch"></button>
+  </div>
+  <div class="confirm" id="svcConfirm" style="display:none;margin:-16px 0 26px">
+    <span>停止后该服务将不可用，进行中的请求会失败。</span><span style="flex:1"></span>
+    <button class="btn ghost" id="cfCancel">取消</button>
+    <button class="btn dgr" id="cfOk">确认停止</button>
+  </div>
+
+  <!-- AUTH -->
+  <div class="sect">
+    <div class="seclabel">AUTH // 授权登录</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <button class="btn pri" id="btnLogin">▸ 发起登录</button>
+      <input type="text" id="authUrl" readonly placeholder="登录地址将在此生成…" style="display:none;flex:1;max-width:340px;background:#f7f6f3">
+      <button class="btn" id="btnCopy" style="display:none" data-copy="#authUrl">复制</button>
+      <button class="btn pri" id="btnOpen" style="display:none">打开登录页 ↗</button>
+      <button class="btn" id="btnCancel" style="display:none">取消</button>
+    </div>
+    <p style="margin:12px 0 0;font-size:12.5px" id="statusRow"><span class="m mono muted">&gt;</span> <span id="statusText">尚未发起登录。</span></p>
+    <p style="margin:6px 0 0;font-size:12.5px;color:var(--bad);display:none" id="errRow"><span class="m mono">!</span> <span id="errText"></span></p>
+  </div>
+
+  <!-- CONFIG -->
+  <div class="sect">
+    <div class="seclabel">CONFIG // Agent 接入信息</div>
+    <div class="tbox"><table><tbody>
+      <tr><td style="width:130px" class="faint" >BASE URL</td>
+          <td><span class="m" id="cfgEndpoint">http://127.0.0.1:11435/v1</span>
+              <button class="btn xs" data-copy="#cfgEndpoint" style="margin-left:8px">复制</button></td></tr>
+      <tr><td class="faint">API KEY</td>
+          <td><input type="password" value="go_sk_7f2a91b3" id="cfgApiKey" readonly style="width:200px;background:#f7f6f3">
+              <button class="btn xs" id="btnKeyToggle" style="margin-left:8px">显示</button>
+              <button class="btn xs" data-copy="#cfgApiKey">复制</button></td></tr>
+      <tr><td class="faint">KEY REF</td><td class="m muted">~/.cmdgo-bridge/config.json → apiKey</td></tr>
+    </tbody></table></div>
+    <pre class="snip" style="margin-top:12px"><span class="faint"># 任何 OpenAI 兼容客户端都可以用（Cherry Studio / Cline / Continue / Cursor 自定义供应商…）</span>
+curl http://127.0.0.1:11435/v1/chat/completions \
+  -H "Authorization: Bearer &lt;API_KEY&gt;" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"&lt;模型ID&gt;","messages":[{"role":"user","content":"你好"}]}'</pre>
+  </div>
+
+  <!-- ACCOUNTS -->
+  <div class="sect">
+    <div class="seclabel">ACCOUNTS // 账号池 · <span id="acctCount">1/2</span> 可用</div>
+    <div id="acctList"></div>
+    <div style="margin-top:12px"><button class="btn dgr xs" id="btnLogout">清空账号池</button></div>
+  </div>
+
+  <!-- MODELS -->
+  <div class="sect">
+    <div class="seclabel">MODELS // 模型目录 · <span id="modelCount">6</span></div>
+    <p class="muted" style="font-size:12.5px;margin:0 0 10px">Go 套餐可用模型已从官方目录同步；点击模型 ID 复制，填入你使用的 Agent 工具。</p>
+    <div id="modelChips" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+  </div>
+
+  <!-- USAGE（补丁口径） -->
+  <div class="sect">
+    <div class="seclabel">USAGE // 累计用量</div>
+    <div class="stat4">
+      <div class="kpi"><h3>累计 Tokens</h3><div class="v">182.4万</div><div class="d">自统计启用起（补丁 /api/usage）</div></div>
+      <div class="kpi"><h3>输入 / 输出</h3><div class="v" style="font-size:18px">112.9万 / 69.5万</div></div>
+      <div class="kpi"><h3>累计请求</h3><div class="v">702</div></div>
+      <div class="kpi"><h3>账号数</h3><div class="v">2</div></div>
+    </div>
+    <p class="faint" style="font-size:11.5px;margin:0">原服务无统计接口；此区块为计划中的只读补丁端点（约 50 行，实施前单独征求同意），当前为示例数据。</p>
+  </div>
+
+  <p class="faint" style="font-size:10.5px;text-align:center;font-family:var(--mono);margin-top:26px">cmdgo-bridge · 非官方个人使用 · 请遵守 Command Code 服务条款</p>
+</div>
+
+<script src="app.js"></script>
+<script>
+/* ---------- 服务开关 ---------- */
+var svcSwitch=$('#svcSwitch'),svcBadge=$('#svcBadge'),svcConfirm=$('#svcConfirm');
+svcSwitch.addEventListener('click',function(){
+  if(svcSwitch.getAttribute('aria-checked')==='true'){svcConfirm.style.display='flex'}
+  else bootMain();
+});
+$('#cfCancel').onclick=function(){svcConfirm.style.display='none'};
+$('#cfOk').onclick=function(){
+  svcConfirm.style.display='none';
+  svcSwitch.disabled=true;svcBadge.className='st stop';svcBadge.innerHTML='<i></i>停止中…';
+  setTimeout(function(){svcSwitch.setAttribute('aria-checked','false');svcSwitch.disabled=false;svcBadge.className='st stop';svcBadge.innerHTML='<i></i>已停止';$('#restartBtn').textContent='启动'},900);
+};
+function bootMain(){
+  svcSwitch.disabled=true;svcBadge.className='st boot';svcBadge.innerHTML='<i></i>启动中…';
+  setTimeout(function(){svcSwitch.disabled=false;svcSwitch.setAttribute('aria-checked','true');svcBadge.className='st run';svcBadge.innerHTML='<i></i>运行中';$('#restartBtn').textContent='重启'},1300);
+}
+$('#restartBtn').addEventListener('click',function(){
+  if(svcSwitch.getAttribute('aria-checked')!=='true')return bootMain();
+  svcSwitch.disabled=true;svcBadge.className='st boot';svcBadge.innerHTML='<i></i>重启中…';
+  setTimeout(function(){svcSwitch.disabled=false;svcBadge.className='st run';svcBadge.innerHTML='<i></i>运行中'},1400);
+});
+
+/* ---------- 登录流程 ---------- */
+var btnLogin=$('#btnLogin'),btnCopy=$('#btnCopy'),btnOpen=$('#btnOpen'),btnCancel=$('#btnCancel'),authUrl=$('#authUrl');
+btnLogin.addEventListener('click',function(){
+  btnLogin.disabled=true;btnLogin.textContent='···';
+  $('#statusText').innerHTML='等待 Command Code 回调…… 在浏览器完成授权后自动变为已登录。<span class="cursor-blink"></span>';
+  setTimeout(function(){
+    btnLogin.style.display='none';
+    authUrl.style.display='';btnCopy.style.display='';btnOpen.style.display='';btnCancel.style.display='';
+    authUrl.value='http://127.0.0.1:5959/auth?state=go_7f2a91';
+  },700);
+});
+btnCancel.addEventListener('click',function(){
+  btnLogin.style.display='';btnLogin.disabled=false;btnLogin.textContent='▸ 发起登录';
+  authUrl.style.display='none';btnCopy.style.display='none';btnOpen.style.display='none';btnCancel.style.display='none';
+  $('#statusText').textContent='已取消。尚未发起登录。';
+});
+btnOpen.addEventListener('click',function(){toast('原型：实际环境将以原生 <a target=_blank> 打开 http://127.0.0.1:5959 登录页')});
+$('#btnKeyToggle').addEventListener('click',function(){
+  var el=$('#cfgApiKey'),show=el.type==='password';
+  el.type=show?'text':'password';this.textContent=show?'隐藏':'显示';
+});
+$('#btnLogout').addEventListener('click',function(){toast('已清空账号池（原型）','err')});
+
+/* ---------- 账号池 ---------- */
+var ACCTS=[
+  {id:'go_acct_9f21c8e4',name:'Command CN · 主号',enabled:true,cooling:false,fail:0,err:''},
+  {id:'go_acct_5c4b3a21',name:'Command CN · 副号',enabled:true,cooling:true,fail:2,err:'429 rate limited, cooldown 12m'}
+];
+function renderAccts(){
+  $('#acctCount').textContent=ACCTS.filter(a=>a.enabled&&!a.cooling).length+'/'+ACCTS.length;
+  $('#acctList').innerHTML=ACCTS.map(function(a){
+    var dot=!a.enabled?'off':a.cooling?'wait':'on';
+    var label=!a.enabled?'DISABLED':a.cooling?'COOLDOWN':'READY';
+    return '<div class="acctrow"><span class="dot '+dot+'"></span>'+
+      '<div style="flex:1;min-width:0"><div class="m" style="font-size:12.5px;color:var(--text)">'+a.name+'</div>'+
+      '<div class="muted m" style="font-size:11px">'+a.id+' · '+label+(a.fail>0?' · fail×'+a.fail:'')+(a.err?' · '+a.err:'')+'</div></div>'+
+      (a.cooling?'<span style="font-size:11px;color:var(--warn)" class="m">冷却中</span>':'')+
+      '<button class="btn xs" data-toggle>'+(!a.enabled?'启用':'停用')+'</button>'+
+      '<button class="btn xs del" data-remove>移除</button></div>';
+  }).join('');
+}
+renderAccts();
+$('#acctList').addEventListener('click',function(e){
+  var b=e.target.closest('button');if(!b)return;
+  if(b.dataset.toggle){toast('账号状态已切换（原型）','ok');return}
+  if(b.dataset.remove){toast('已移除（原型：移除账号 X？其 API key 将一并删除）','err')}
+});
+
+/* ---------- 模型 chips ---------- */
+var MODELS=['gpt-5.2-codex','gpt-5.2','o4-mini','o4-mini-high','gpt-5.2-mini','claude-sonnet-4-6'];
+$('#modelChips').innerHTML=MODELS.map(function(m){
+  return '<span class="chip" data-copy-text="'+m+'" style="cursor:pointer">'+m+'</span>';
+}).join('');
+</script>
+</body>
+</html>

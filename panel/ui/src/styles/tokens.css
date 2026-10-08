@@ -1,0 +1,156 @@
+/* ============================================================
+   字体：Inter（拉丁）+ JetBrains Mono（拉丁）作为独立 woff2 放在 public/fonts，
+   不用 base64 内嵌（那会把应用 CSS 从 26KB 撑到 130KB+，且无法单独缓存）。
+   中文回落到系统字体。变量在 tokens 里统一暴露，base.css / svc.css 只引用变量。
+   ============================================================ */
+@font-face {
+  font-family: 'Inter'; font-style: normal; font-weight: 400 600; font-display: swap;
+  src: url('/fonts/inter-latin.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'JB Mono'; font-style: normal; font-weight: 400 600; font-display: swap;
+  src: url('/fonts/jbmono-latin.woff2') format('woff2');
+}
+
+/* ============================================================
+   tokens · 指挥台 Ops（默认主题）
+   设计读数：dashboard，面向本机运维自己。
+     DESIGN_VARIANCE 3  · 对称 12 栏网格，不做非对称
+     MOTION_INTENSITY 4 · 只有反馈与状态类动效，全部 <=180ms
+     VISUAL_DENSITY  9  · Cockpit：细线分隔、不用卡片盒、数据单元用等宽数字
+   结构靠细线 + 网格 + 字号阶梯，不靠阴影与圆角盒子。
+   全部结构性取值都在这里，base.css / svc.css 只引用变量。
+   ============================================================ */
+:root,
+[data-theme='ops'] {
+  color-scheme: light;
+
+  /* --- 色板 --- */
+  --bg: #ffffff;
+  --text: #16181a;
+  --muted: #8a857e;
+  --faint: #a8a39b;
+  --line: #e7e5e1;
+  --line-soft: #f0eeeb;
+  --sunken: #f7f6f4;          /* 次级底：代码块、只读输入 */
+  --accent: #2e64f0;          /* 唯一强调色：当前项与关键数字 */
+  --accent-soft: rgba(46, 100, 240, 0.08);
+  --accent-on: #eef3fe;       /* 选中底的浅蓝 */
+  --btn-ink: #16181a;
+  --btn-bg: #fff;
+  --btn-border: var(--line);
+  --btn-line: #d9d5cf;        /* 控件边线：比 --line 明确一档，但仍是一条细线 */
+  --btn-pri-bg: #16181a;
+  --btn-pri-fg: #fff;
+  --bar-fill: rgba(22, 24, 26, 0.16);
+  --seg-on-bg: #16181a;
+  --seg-on-color: #fff;
+  --alert-fg: #8a6100;
+  --alert-bg: #fff3d6;
+  --alert-border: #f0dfae;
+  --ok: #1f9d5b;   --ok-soft: rgba(31, 157, 91, 0.10);
+  --warn: #c98a0b; --warn-soft: rgba(201, 138, 11, 0.10);
+  --cool: #c07427; --cool-soft: rgba(192, 116, 39, 0.10);
+  --bad: #ce3b2c;  --bad-soft: rgba(206, 59, 44, 0.09);
+  --off: #a8a39b;  --off-soft: rgba(168, 163, 155, 0.12);
+
+  /* --- 区块（Ops = 去卡片化：区块只有一条上边线） --- */
+  --card-bg: transparent;
+  --card-border: none;
+  --card-shadow: none;
+  --card-blur: none;
+  --card-radius: 0;
+  --sect-pad: 13px 0 0;        /* 上边线与内容之间的呼吸 */
+  --sect-gap: 22px;
+  --grid-gap: 22px;
+  --kpi-pad: 14px 20px 15px;
+  --kpi-sep: 1px solid var(--line);
+  --card-hover: none;
+
+  /* --- 布局 --- */
+  --wrap-max: 100%;            /* 铺满：曾经限 1440/1560 又在 1920 下左对齐，留下大块死白 */
+  --wrap-pad: 22px 24px 30px;
+  --side-w: 56px;              /* 图标栏 */
+  --stage-ml: 56px;
+  --side-inset: 0;
+  --side-radius: 0;
+  --side-bg: #fff;
+  --side-border: 1px solid var(--line);
+  --side-shadow: none;
+  --side-blur: none;
+  --side-item-hover: var(--sunken);
+  --side-item-on-bg: var(--accent-on);
+  --side-item-on-color: var(--accent);
+  --side-item-on-shadow: none;
+
+  /* --- 字体 --- */
+  --font-sans: 'Inter', 'Microsoft YaHei UI', 'Microsoft YaHei', 'PingFang SC', -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'JB Mono', ui-monospace, 'Cascadia Mono', Consolas, 'Microsoft YaHei UI', monospace;
+
+  /* --- 圆角：只有三档，全站一致 --- */
+  --r: 9px;
+  --r-card: 0;
+  --r-ctl: 6px;
+
+  /* --- 动效：只有反馈与状态，全部 <=180ms；进入/移动用强曲线 --- */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --dur-press: 110ms;
+  --dur-hover: 140ms;
+  --dur-state: 180ms;
+  --dur-view: 150ms;
+
+  /* --- 弹层 / 浮层（保留玻璃，但收窄圆角与阴影） --- */
+  --veil-bg: rgba(22, 24, 26, 0.28);
+  --modal-bg: rgba(255, 255, 255, 0.94);
+  --modal-border: 1px solid rgba(231, 229, 225, 0.9);
+  --modal-shadow: 0 24px 64px rgba(22, 24, 26, 0.18);
+  --toast-bg: #fff;
+}
+
+/* Ops 主题的结构性覆盖：页签是下划线式，不是胶囊 */
+[data-theme='ops'] .tabs {
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  padding: 0;
+  gap: 0;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+[data-theme='ops'] .tabs button {
+  padding: 9px 15px;
+  border-radius: 0;
+  font-weight: 500;
+  transition: color var(--dur-hover) var(--ease);
+}
+[data-theme='ops'] .tabs button.on {
+  background: transparent;
+  color: var(--text);
+  font-weight: 550;
+  box-shadow: none;
+  position: relative;
+}
+[data-theme='ops'] .tabs button.on::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; bottom: -1px;
+  height: 2px;
+  background: var(--text);
+}
+
+/* 视图进入：唯一目的＝避免内容瞬移。150ms、只做透明度 + 3px、单元素不 stagger。 */
+@media (prefers-reduced-motion: no-preference) {
+  [data-theme='ops'] .tabpanel,
+  [data-theme='ops'] .view-enter { animation: opsViewIn var(--dur-view) var(--ease-out); }
+  @keyframes opsViewIn {
+    from { opacity: 0; transform: translateY(3px); }
+    to { opacity: 1; transform: none; }
+  }
+}
+/* 减少动效：保留帮助理解的透明度与颜色，去掉位移与循环 */
+@media (prefers-reduced-motion: reduce) {
+  [data-theme='ops'] .tabpanel,
+  [data-theme='ops'] .view-enter { animation: none; }
+}

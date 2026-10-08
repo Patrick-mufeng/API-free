@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>API-free 统一面板 · 风格 Demo 选择器</title>
+<style>
+  html, body { height: 100%; }
+  body { margin: 0; background: #0e0f12; }
+  #stage, #stage iframe { display: block; width: 100%; height: 100%; border: 0; }
+
+  /* ---- picker（规范原样，勿改样式）---- */
+  .proto-picker {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 2147483647;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 4px;
+    border-radius: 999px;
+    background: rgba(10, 10, 10, 0.82);
+    -webkit-backdrop-filter: blur(12px) saturate(1.4);
+    backdrop-filter: blur(12px) saturate(1.4);
+    box-shadow:
+      0 0 0 1px rgba(255, 255, 255, 0.08) inset,
+      0 8px 24px rgba(0, 0, 0, 0.24),
+      0 2px 6px rgba(0, 0, 0, 0.12);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 13px;
+    line-height: 1;
+    -webkit-font-smoothing: antialiased;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .proto-picker-highlight {
+    position: absolute;
+    top: 4px;
+    left: 0;
+    height: 28px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.12);
+    will-change: transform;
+  }
+  .proto-picker[data-ready] .proto-picker-highlight {
+    transition:
+      transform 250ms cubic-bezier(0.23, 1, 0.32, 1),
+      width 250ms cubic-bezier(0.23, 1, 0.32, 1);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .proto-picker[data-ready] .proto-picker-highlight { transition: none; }
+  }
+  .proto-picker-item {
+    position: relative;
+    display: flex;
+    align-items: center;
+    height: 28px;
+    padding: 0 12px;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.55);
+    font: inherit;
+    cursor: pointer;
+    transition: color 150ms ease-out;
+  }
+  .proto-picker-item:hover { color: rgba(255, 255, 255, 0.85); }
+  .proto-picker-item:active { transform: scale(0.97); }
+  .proto-picker-item:focus-visible {
+    outline: 2px solid rgba(255, 255, 255, 0.4);
+    outline-offset: 2px;
+  }
+  .proto-picker-item[data-active] { color: #fff; }
+  .proto-picker-divider {
+    width: 1px;
+    height: 16px;
+    margin: 0 4px;
+    background: rgba(255, 255, 255, 0.12);
+  }
+  .proto-picker-replay { padding: 0 10px; font-size: 14px; }
+</style>
+</head>
+<body>
+  <div id="stage"><iframe id="frame" src="demo-1-warm.html" title="demo"></iframe></div>
+
+  <nav class="proto-picker" aria-label="Prototype variants">
+    <span class="proto-picker-highlight" aria-hidden="true"></span>
+    <button class="proto-picker-item" data-active aria-current="true">1 暖沙</button>
+    <button class="proto-picker-item">2 午夜</button>
+    <button class="proto-picker-item">3 冷泉</button>
+    <button class="proto-picker-item">4 彩釉</button>
+    <button class="proto-picker-item">5 素瓷</button>
+    <span class="proto-picker-divider" aria-hidden="true"></span>
+    <button class="proto-picker-item proto-picker-replay" aria-label="Replay animation (R)">↻</button>
+  </nav>
+
+<script>
+  var variants = [
+    'demo-1-warm.html',
+    'demo-2-midnight.html',
+    'demo-3-mineral.html',
+    'demo-4-bento.html',
+    'demo-5-porcelain.html'
+  ];
+  var frame = document.getElementById('frame');
+  var picker = document.querySelector('.proto-picker');
+  var highlight = picker.querySelector('.proto-picker-highlight');
+  var items = [...picker.querySelectorAll('.proto-picker-item:not(.proto-picker-replay)')];
+  var replay = picker.querySelector('.proto-picker-replay');
+  var current = 0;
+
+  function moveHighlight() {
+    var el = items[current];
+    highlight.style.width = el.offsetWidth + 'px';
+    highlight.style.transform = 'translateX(' + el.offsetLeft + 'px)';
+  }
+
+  function mount(i) {
+    // 重挂载 = 重载 iframe，入场动画随之重跑；切换本身无过渡。
+    frame.src = variants[i] + '?t=' + Date.now();
+  }
+
+  function setActive(i) {
+    if (i < 0 || i >= variants.length) return;
+    current = i;
+    items.forEach(function (el, j) {
+      el.toggleAttribute('data-active', j === i);
+      if (j === i) el.setAttribute('aria-current', 'true');
+      else el.removeAttribute('aria-current');
+    });
+    moveHighlight();
+    var url = new URL(location);
+    url.searchParams.set('v', i + 1);
+    history.replaceState(null, '', url);
+    mount(i);
+  }
+
+  items.forEach(function (el, i) { el.addEventListener('click', function () { setActive(i); }); });
+  replay.addEventListener('click', function () { mount(current); });
+  window.addEventListener('resize', moveHighlight);
+
+  document.addEventListener('keydown', function (e) {
+    if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) || e.target.isContentEditable) return;
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    var num = parseInt(e.key, 10);
+    if (num >= 1 && num <= variants.length) setActive(num - 1);
+    else if (e.key === 'ArrowRight') setActive((current + 1) % variants.length);
+    else if (e.key === 'ArrowLeft') setActive((current - 1 + variants.length) % variants.length);
+    else if (e.key === 'r' || e.key === 'R') mount(current);
+  });
+
+  setActive((parseInt(new URLSearchParams(location.search).get('v'), 10) || 1) - 1);
+  requestAnimationFrame(function () { requestAnimationFrame(function () { picker.setAttribute('data-ready', ''); }); });
+</script>
+</body>
+</html>

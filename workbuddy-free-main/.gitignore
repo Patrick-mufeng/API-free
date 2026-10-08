@@ -1,0 +1,66 @@
+# Auth & secrets
+auths/
+data/
+*.key
+*.pem
+*.env
+.env
+.env.*
+
+# Binaries (anchored to repo root only — bare "login"/"credit" would also ignore cmd/login/, cmd/credit/)
+/login
+/credit
+/wb2api
+/signin_bin
+
+# Config with secrets (use config.example.json)
+config.json
+
+# Build artifacts
+*.tmp
+__pycache__/
+
+# 多平台构建产物暂存目录（打 Release 用，产物走 GitHub Release 而非版本库）
+/dist/
+
+# Backups (contains auth tokens)
+backups/
+
+# IDE / 本地工作文档
+.idea/
+.vscode/
+LOOP.md
+PLAN.md
+SPEC.md
+# docs/ 是本地使用文档（guide.md + 配图，自包含可直接拷走），仅本地留存，
+# 不进版本库也不进镜像。
+docs/
+
+# 设计/计划文档（但 README.md 必须进版本库）
+*.md
+!README.md
+# 例外：internal/prompt/defaultprompt.md 被 internal/prompt/prompt.go 以 go:embed
+# 引用，是源码而非文档。被上面的 *.md 规则漏掉会让新克隆的仓库直接编译失败
+# （pattern defaultprompt.md: no matching files found）。
+!internal/prompt/defaultprompt.md
+
+# Windows binaries（*.exe 兜底覆盖 cmd/* 全部产物，避免新增子命令时再漏）
+*.exe
+# 网关运行中重编时，Go 会把被锁住的旧镜像改名成 *.exe~ 再写新文件——
+# 那是 10MB 级的二进制备份，别让它混进提交。
+*.exe~
+/wb2api.exe
+/login.exe
+/credit.exe
+/trial.exe
+/signin_bin.exe
+
+# 本机启动辅助脚本（Windows 专用，含本机绝对路径，不进版本库）
+start-gateway.bat
+start-gateway.ps1
+stop-gateway.bat
+
+# 本地验证工具（判据逆向过程脚本；对应结论笔记属本地工作文档，未随仓库分发）
+/cmd/desktopverify*/
+*.zip
+server.exe
