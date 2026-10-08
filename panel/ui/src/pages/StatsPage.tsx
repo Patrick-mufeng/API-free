@@ -1,6 +1,6 @@
 /* 统计页：跨服务聚合（M3）—— 数据来自面板 SQLite（5 分钟拉取一轮，可手动刷新） */
 import { useCallback, useEffect, useState } from 'react'
-import { AreaChart, PageHead, toast } from '../components/ui'
+import { AreaChart, Legend, PageHead, toast } from '../components/ui'
 import { fetchServices, fetchStats, refreshStats, type StatsData } from '../api'
 import { svcColor, toViews, orderIndex, type SvcView } from '../data/services'
 import { fmtInt, fmtTok } from '../data/format'
@@ -8,7 +8,8 @@ import { fmtInt, fmtTok } from '../data/format'
 export function StatsPage() {
   const [data, setData] = useState<StatsData | null>(null)
   const [svcs, setSvcs] = useState<SvcView[]>([])
-  const [mode, setMode] = useState<'total' | 'split'>('total')
+  /* 图例选中的服务：空 = 合计（输入/输出分层）；选中若干 = 只看这几家 */
+  const [picked, setPicked] = useState<string[]>([])
   const [err, setErr] = useState('')
 
   useEffect(() => {
@@ -54,9 +55,16 @@ export function StatsPage() {
     return <div className="wrap"><div className="loading">加载统计中…</div></div>
   }
 
-  const days = data.days
+  /* 收录起点之前的空日子不画：那不是「用量为 0」，而是「还没有记录」。
+     整段 0 会把曲线压成一条贴底的直线，30 格宽度只用上最后一格；
+     攒满 30 天后窗口自然就是完整的 30 天。明细表只列有记录的日子，不受影响。 */
+  const allDays = data.days
+  const firstDay = allDays.findIndex((d) => d.total.input + d.total.output + d.total.reqs > 0)
+  const days = firstDay > 0 ? allDays.slice(firstDay) : allDays
   const labels = days.map((d) => d.date.slice(5))
-  const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#3b82f6'
+  /* 合计用中性两档（墨色 / 浅灰）：输入/输出是同一度量的两部分，两档比两个色相更清楚 */
+  const ink = 'var(--text)'
+  const inkSoft = 'var(--faint)'
 
   // 服务清单：名称取注册表（真实），统计里出现过的服务一律补上，避免丢掉数据
   const seen = new Map<string, { id: string; name: string; color: string }>(
@@ -68,11 +76,25 @@ export function StatsPage() {
   }
   const metas = [...seen.values()].sort((a, b) => orderIndex(a.id) - orderIndex(b.id))
 
+  const pickedMetas = metas.filter((m) => picked.includes(m.id))
+  const scoped = (f: (e: { input: number; output: number; reqs: number }) => number) =>
+    pickedMetas.length === 0
+      ? days.reduce((a, d) => a + f(d.total), 0)
+      : days.reduce((a, d) => a + pickedMetas.reduce((b, m) => b + (d.services[m.id] ? f(d.services[m.id]) : 0), 0), 0)
   const series =
-    mode === 'total'
-      ? [{ name: 'total', color: accent, data: days.map((d) => d.total.input + d.total.output) }]
-      : metas.map((s) => ({ name: s.name, color: s.color, data: days.map((d) => { const e = d.services[s.id]; return e ? e.input + e.output : 0 }) }))
-  const reqData = days.map((d) => d.total.reqs)
+    pickedMetas.length === 0
+      ? [
+          { name: '输入', color: ink, data: days.map((d) => d.total.input) },
+          { name: '输出', color: inkSoft, data: days.map((d) => d.total.output) },
+        ]
+      : pickedMetas.map((s) => ({ name: s.name, color: s.color, data: days.map((d) => { const e = d.services[s.id]; return e ? e.input + e.output : 0 }) }))
+  const chartMode: 'stack' | 'split' = pickedMetas.length === 0 ? 'stack' : 'split'
+  const scopeName = pickedMetas.length === 0 ? '全部服务' : pickedMetas.length === 1 ? pickedMetas[0].name : `${pickedMetas.length} 家`
+  const scopeTok = scoped((e) => e.input + e.output)
+  const scopeReqs = scoped((e) => e.reqs)
+  const reqData = days.map((d) => (pickedMetas.length === 0
+    ? d.total.reqs
+    : pickedMetas.reduce((a, m) => a + (d.services[m.id]?.reqs ?? 0), 0)))
   const startIdx = days.findIndex((d) => d.total.input + d.total.output + d.total.reqs > 0)
 
   const totalsArr = metas.map((s) => ({ ...s, v: data.totals[s.id] ?? { input: 0, output: 0, reqs: 0 } }))
@@ -100,34 +122,56 @@ export function StatsPage() {
       <div className="duo-wide">
       <div className="sect" style={{ marginBottom: 0 }}>
         <div className="sect-head">
-          <h3>对比趋势</h3><span className="sub">近 30 天 · 每日 Tokens</span><span className="sp" />
-          <div className="seg">
-            <button className={mode === 'total' ? 'on' : ''} onClick={() => setMode('total')}>合计</button>
-            <button className={mode === 'split' ? 'on' : ''} onClick={() => setMode('split')}>分服务</button>
-          </div>
+          <h3>Token 用量</h3>
+          <span className="sub">
+            最近 {days.length} 天 · 每日 Tokens · {scopeName} {fmtTok(scopeTok)} tok · {fmtInt(scopeReqs)} 次
+          </span>
+          <span className="sp" />
         </div>
+        <Legend
+          entries={metas.map((s) => ({ id: s.id, name: s.name, color: s.color, value: (data.totals[s.id]?.input ?? 0) + (data.totals[s.id]?.output ?? 0) }))}
+          selected={picked}
+          onToggle={(id) => setPicked((xs) => (xs.includes(id) ? xs.filter((x) => x !== id) : [...xs, id]))}
+          onClear={() => setPicked([])}
+          allValue={grand}
+        />
         <AreaChart
           series={series}
-          mode={mode === 'total' ? 'area' : 'split'}
+          mode={chartMode}
           labels={labels}
           reqData={reqData}
           startIdx={startIdx >= 0 ? startIdx : undefined}
           onHover={(i) => {
-            if (mode === 'total') return `<b>${labels[i]}</b>${fmtTok(series[0].data[i])} tok · ${fmtInt(reqData[i])} 次`
-            return `<b>${labels[i]}</b>` + metas.map((s, k) => `<span style="color:${s.color}">●</span> ${fmtTok(series[k].data[i])}`).join('&nbsp; ')
+            if (chartMode === 'stack') {
+              const inTok = series[0].data[i] ?? 0
+              const outTok = series[1].data[i] ?? 0
+              return `<b>${labels[i]}</b>输入 ${fmtTok(inTok)} · 输出 ${fmtTok(outTok)}<br>合计 ${fmtTok(inTok + outTok)} tok · ${fmtInt(reqData[i])} 次请求`
+            }
+            const sum = series.reduce((a, s) => a + (s.data[i] ?? 0), 0)
+            return `<b>${labels[i]}</b>${series.length > 1 ? `　合计 ${fmtTok(sum)}` : ''}<br>`
+              + series.map((s) => `<span style="color:${s.color}">●</span> ${s.name} ${fmtTok(s.data[i])}`).join('&nbsp; ')
           }}
         />
+        {chartMode === 'stack' && (
+          <div className="legend" style={{ borderTop: 0, paddingTop: 0, marginTop: 2 }}>
+            <span className="lgdot"><i style={{ background: ink }} />输入 Tokens</span>
+            <span className="lgdot"><i style={{ background: inkSoft }} />输出 Tokens</span>
+          </div>
+        )}
       </div>
 
         <div className="sect" style={{ marginBottom: 0 }}>
-          <div className="sect-head"><h3>服务占比</h3><span className="sub">30 天</span></div>
+          <div className="sect-head"><h3>服务占比</h3><span className="sub">30 天 Tokens</span></div>
           <div className="rank">
             {totalsArr.map((t) => {
               const v = t.v.input + t.v.output
               const p = Math.round((v / grand) * 1000) / 10
               return (
                 <div key={t.id} className="r">
-                  <div className="t"><b><i style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 2, background: t.color, marginRight: 7 }} />{t.name}</b><span>{p}%</span></div>
+                  <div className="t">
+                    <b><i style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 2, background: t.color, marginRight: 7 }} />{t.name}</b>
+                    <span className="mono">{fmtTok(v)} · {p}%</span>
+                  </div>
                   <div className="bar"><i style={{ width: p + '%', background: t.color }} /></div>
                 </div>
               )

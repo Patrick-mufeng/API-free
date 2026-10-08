@@ -1,5 +1,5 @@
 /* 自动生成，勿手改 —— 由 prototypes/v2/assets/build-logo.mjs 与 build-assets.mjs 的同源脚本产出。
-   1) 四家上游服务的官方 logo：取自各自官网的 favicon / brand 资产（qoder.com favIcon.svg、
+   1) 上游服务的官方 logo（zen 是自建服务、没有官方图形，由 ServiceIcons 退化为中性字母牌）：取自各自官网的 favicon / brand 资产（qoder.com favIcon.svg、
       cline.bot /assets/branding、workbuddy.ai assets/logo.svg、commandcode.ai favicon），
       统一栅格化为 192×192 PNG 内嵌，保留官方底板与配色 —— 品牌资产按原样使用，不要改色。
    2) 面板主标「两个梯子搭成的一个 A」：每条腿是一把梯子（两平行轨 + 垂直横档），

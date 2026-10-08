@@ -1,10 +1,10 @@
 /* 总览（指挥台）
-   布局：6 格 KPI 统计带 → 四张服务细线卡 → 用量趋势(7) + 时段分布(5) → 排行(4) + 服务质量(4) + 面板事件(4) → 接入入口/口径信息带
+   布局：6 格 KPI 统计带 → 每个服务一张细线卡（宽屏一行） → 用量趋势(7) + 时段分布(5) → 排行(4) + 服务质量(4) + 面板事件(4) → 接入入口/口径信息带
    全部数据来自面板接口（/api/services、/api/stats、/api/svcinfo、/api/events），
    取不到就显示「—」，不用示例数字兜底。 */
 import { useEffect, useRef, useState } from 'react'
-import type { ReactNode } from 'react'
-import { AreaChart, Badge, PageHead, Segmented, Switch, toast } from '../components/ui'
+import type { CSSProperties, ReactNode } from 'react'
+import { AreaChart, Badge, Legend, PageHead, Switch, toast, type Series } from '../components/ui'
 import { ServiceGlyph } from '../components/ServiceIcons'
 import {
   ctlService,
@@ -23,8 +23,6 @@ import {
 } from '../api'
 import { toViews, type SvcView } from '../data/services'
 import { fmtInt, fmtTok } from '../data/format'
-
-type Mode = 'all' | 'split'
 
 /* 行内迷你趋势：30 天阶梯面积。
    窄格里画 31 根柱每根只有 1px 多，细到读不出趋势；阶梯面积能一眼看出
@@ -58,7 +56,8 @@ function Spark({ vals, color }: { vals: number[]; color: string }) {
 
 export function OverviewPage({ onOpenService }: { onOpenService: (id: string) => void }) {
   const [svcs, setSvcs] = useState<SvcView[]>([])
-  const [mode, setMode] = useState<Mode>('all')
+  /* 图表选中的服务：空 = 合计（输入/输出分层），选中若干 = 只看这几家（各自一色） */
+  const [picked, setPicked] = useState<string[]>([])
   const [confirmId, setConfirmId] = useState<string | null>(null)
   const [pending, setPending] = useState<Record<string, 'start' | 'stop'>>({})
   const pendingRef = useRef(pending)
@@ -174,7 +173,10 @@ export function OverviewPage({ onOpenService }: { onOpenService: (id: string) =>
   }
 
   /* ---------- 派生 ---------- */
-  const accent = '#16181a'
+  /* 输入 / 输出 用同一度量的两档中性色（墨色 vs 浅灰），不引入新色相：
+     填充低透明度、描边实色，两层叠起来边界与总量轮廓都看得见。 */
+  const accent = 'var(--text)'
+  const accentSoft = 'var(--faint)'
   const active = svcs.filter((s) => s.status !== 'stopped')
   const stopped = svcs.filter((s) => s.status === 'stopped')
   const cardOf = (id: string): SvcCard | undefined => info?.services.find((c) => c.svc === id)
@@ -190,17 +192,43 @@ export function OverviewPage({ onOpenService }: { onOpenService: (id: string) =>
 
   const realDays = stats?.days
   const prevRow = realDays && realDays.length > 1 ? realDays[realDays.length - 2] : undefined
-  const labels = realDays ? realDays.map((d) => d.date.slice(5)) : []
-  const series =
-    mode === 'all'
-      ? [{ name: 'all', color: accent, data: realDays ? realDays.map((d) => d.total.input + d.total.output) : [] }]
-      : svcs.map((s) => ({
-          name: s.name,
-          color: s.color,
-          data: realDays ? realDays.map((d) => { const e = d.services[s.id]; return e ? e.input + e.output : 0 }) : [],
-        }))
-  const reqData = mode === 'all' ? realDays?.map((d) => d.total.reqs) : undefined
-  const startIdx = realDays?.findIndex((d) => d.total.input + d.total.output + d.total.reqs > 0) ?? -1
+  /* 趋势图的取数范围：图例里没选服务 = 全部合计；选了 = 只看这几家。
+     合计时按「输入 / 输出」分层（同一度量的两部分），选中多家时每家一条线。
+     口径都来自面板自己的按天聚合，不新造数字。 */
+  const pickedMetas = svcs.filter((s) => picked.includes(s.id))
+  const allDays = realDays ?? []
+  /* 收录起点之前的日子是「还没有记录」，不是「用量为 0」：整段 0 会把曲线压成一条
+     贴底的直线，30 格的宽度只用上最后一格。所以从第一个有记录的日子开始画，
+     攒满 30 天后自然就是完整的 30 天。（卡片上的迷你曲线不裁——那里贴着底反而说明问题） */
+  const firstDay = allDays.findIndex((d) => d.total.input + d.total.output + d.total.reqs > 0)
+  const days = firstDay > 0 ? allDays.slice(firstDay) : allDays
+  const labels = days.map((d) => d.date.slice(5))
+  const sumOf = (f: (day: StatsData['days'][number], id: string) => number) =>
+    pickedMetas.length === 0 ? 0 : days.reduce((a, d) => a + pickedMetas.reduce((b, s) => b + f(d, s.id), 0), 0)
+  const pickTok = sumOf((d, id) => { const e = d.services[id]; return e ? e.input + e.output : 0 })
+  const pickReqs = sumOf((d, id) => d.services[id]?.reqs ?? 0)
+  const pickIn = sumOf((d, id) => d.services[id]?.input ?? 0)
+  const pickOut = sumOf((d, id) => d.services[id]?.output ?? 0)
+  const scopeTok = pickedMetas.length === 0 ? days.reduce((a, d) => a + d.total.input + d.total.output, 0) : pickTok
+  const scopeReqs = pickedMetas.length === 0 ? days.reduce((a, d) => a + d.total.reqs, 0) : pickReqs
+  const scopeName = pickedMetas.length === 0
+    ? '全部服务'
+    : pickedMetas.length === 1 ? pickedMetas[0].name : `${pickedMetas.length} 家`
+  const series: Series[] = pickedMetas.length === 0
+    ? [
+        { name: '输入', color: accent, data: days.map((d) => d.total.input) },
+        { name: '输出', color: accentSoft, data: days.map((d) => d.total.output) },
+      ]
+    : pickedMetas.map((s) => ({
+        name: s.name,
+        color: s.color,
+        data: days.map((d) => { const e = d.services[s.id]; return e ? e.input + e.output : 0 }),
+      }))
+  const chartMode: 'stack' | 'split' = pickedMetas.length === 0 ? 'stack' : 'split'
+  const reqData = days.map((d) => (pickedMetas.length === 0
+    ? d.total.reqs
+    : pickedMetas.reduce((a, s) => a + (d.services[s.id]?.reqs ?? 0), 0)))
+  const startIdx = days.findIndex((d) => d.total.input + d.total.output + d.total.reqs > 0)
 
   /* 30 天合计（由真实逐日汇总，不新造口径） */
   const t30 = (realDays ?? []).reduce(
@@ -342,8 +370,9 @@ export function OverviewPage({ onOpenService }: { onOpenService: (id: string) =>
         </div>
       </div>
 
-      {/* ---------- 服务：四张细线卡 ---------- */}
-      <div className="svcards">
+      {/* ---------- 服务：一服务一张细线卡（宽屏按服务数排一行） ---------- */}
+      {/* 列数交给 CSS：宽屏按服务数排一行（见 base.css 的 --svc-cols） */}
+      <div className="svcards" style={{ '--svc-cols': svcs.length } as CSSProperties}>
         {svcs.map((s) => {
           const c = cardOf(s.id)
           const t = todayOf(s.id)
@@ -438,30 +467,37 @@ export function OverviewPage({ onOpenService }: { onOpenService: (id: string) =>
         <section className="sect s7">
           <div className="sect-head">
             <h3>用量趋势</h3>
-            <span className="faint" style={{ fontSize: 11 }}>30 天 · 每日 Tokens</span>
+            <span className="faint" style={{ fontSize: 11 }}>
+              30 天 · {scopeName} {fmtTok(scopeTok)} tok · {fmtInt(scopeReqs)} 次
+              {pickedMetas.length > 0 ? `　输入 ${fmtTok(pickIn)} / 输出 ${fmtTok(pickOut)}` : ''}
+            </span>
             <span className="sp" />
-            <Segmented
-              options={[{ v: 'all' as Mode, label: '全部' }, { v: 'split' as Mode, label: '按服务分线' }]}
-              value={mode}
-              onChange={setMode}
-            />
           </div>
+          <Legend
+            entries={svcs.map((s) => ({ id: s.id, name: s.name, color: s.color, value: perSvcSeries(s.id).reduce((a, b) => a + b, 0) }))}
+            selected={picked}
+            onToggle={(id) => setPicked((xs) => (xs.includes(id) ? xs.filter((x) => x !== id) : [...xs, id]))}
+            onClear={() => setPicked([])}
+            allValue={t30.tok}
+          />
           {realDays && realDays.length > 1 ? (
             <AreaChart
               series={series}
-              mode={mode === 'all' ? 'area' : 'split'}
+              mode={chartMode}
               labels={labels}
               barStyle="tick"
               reqData={reqData}
               height={200}
               startIdx={startIdx >= 0 ? startIdx : undefined}
               onHover={(i) => {
-                if (mode === 'all') {
-                  const v = series[0].data[i] ?? 0
-                  const r = reqData?.[i] ?? 0
-                  return `<b>${labels[i]}</b>合计 ${fmtTok(v)} tok · ${fmtInt(r)} 次`
+                if (chartMode === 'stack') {
+                  const inTok = series[0].data[i] ?? 0
+                  const outTok = series[1].data[i] ?? 0
+                  return `<b>${labels[i]}</b>输入 ${fmtTok(inTok)} · 输出 ${fmtTok(outTok)}<br>合计 ${fmtTok(inTok + outTok)} tok · ${fmtInt(reqData?.[i] ?? 0)} 次请求`
                 }
-                return `<b>${labels[i]}</b>` + series.map((s) => `<span style="color:${s.color}">●</span> ${fmtTok(s.data[i])}`).join('&nbsp; ')
+                const sum = series.reduce((a, s) => a + (s.data[i] ?? 0), 0)
+                return `<b>${labels[i]}</b>${series.length > 1 ? `　合计 ${fmtTok(sum)}` : ''}<br>`
+                  + series.map((s) => `<span style="color:${s.color}">●</span> ${s.name} ${fmtTok(s.data[i])}`).join('&nbsp; ')
               }}
             />
           ) : (
@@ -470,11 +506,10 @@ export function OverviewPage({ onOpenService }: { onOpenService: (id: string) =>
               <span>面板每 5 分钟从运行中的服务拉一轮统计；累积两天以上就会出现曲线。</span>
             </div>
           )}
-          {mode === 'split' && realDays && realDays.length > 1 && (
-            <div className="legend">
-              {svcs.map((s) => (
-                <span key={s.id}><i style={{ background: s.color }} />{s.name}</span>
-              ))}
+          {chartMode === 'stack' && realDays && realDays.length > 1 && (
+            <div className="legend" style={{ borderTop: 0, paddingTop: 0, marginTop: 2 }}>
+              <span className="lgdot"><i style={{ background: accent }} />输入 Tokens</span>
+              <span className="lgdot"><i style={{ background: accentSoft }} />输出 Tokens</span>
             </div>
           )}
           <p className="ovnote faint">{statsNote(stats)}</p>
@@ -616,7 +651,7 @@ export function OverviewPage({ onOpenService }: { onOpenService: (id: string) =>
             </table>
           </div>
           <p className="ovnote faint">
-            只记面板自身动作。逐条请求流水四个服务都没有结构化接口，见各服务「日志」页签；用量聚合见「统计」页。
+            只记面板自身动作。逐条请求流水五个服务都没有结构化接口，见各服务「日志」页签；用量聚合见「统计」页。
           </p>
         </section>
 
@@ -639,7 +674,7 @@ export function OverviewPage({ onOpenService }: { onOpenService: (id: string) =>
             <dt>进程监督</dt><dd>30s 起指数退避，上限 10 分钟；面板外起的实例会被接管</dd>
           </dl>
           <p className="ovnote faint">
-            四家仍是四个独立入口，没有「一个 base URL 调四家」的聚合入口。
+            五家仍是五个独立入口，没有「一个 base URL 调五家」的聚合入口。
           </p>
         </section>
       </div>

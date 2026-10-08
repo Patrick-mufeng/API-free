@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { ReactNode } from 'react'
 import { fmtTok } from '../data/format'
+import { ServiceGlyph } from './ServiceIcons'
 
 /* ---------- 弹层（渲染到 body） ----------
    为什么必须 Portal：`.veil` 用的是 `position: fixed; inset: 0`，而 CSS 规范里
@@ -118,6 +119,59 @@ export function Toaster() {
   )
 }
 
+/* ---------- 图例：可点选的服务片 ----------
+   之前 .legend 只有类名没有样式（等于裸文本），也没有交互。这里做成：
+   「全部」+ 每个服务一片，片上带官方 logo 与 30 天 Tokens；点一下把图切到那一家。 */
+export interface LegendEntry {
+  id: string
+  name: string
+  color: string
+  value: number
+}
+
+export function Legend({
+  entries,
+  selected,
+  onToggle,
+  onClear,
+  allValue,
+  allLabel = '全部',
+}: {
+  entries: LegendEntry[]
+  selected: string[]
+  onToggle: (id: string) => void
+  onClear: () => void
+  allValue?: number
+  allLabel?: string
+}) {
+  const on = (id: string) => selected.includes(id)
+  return (
+    <div className="legend">
+      <button
+        className={`lgchip${selected.length === 0 ? ' on' : ''}`}
+        onClick={onClear}
+        title="显示全部服务的合计"
+      >
+        <span className="lgall">{allLabel}</span>
+        {allValue !== undefined && <b>{fmtTok(allValue)}</b>}
+      </button>
+      {entries.map((e) => (
+        <button
+          key={e.id}
+          className={`lgchip${on(e.id) ? ' on' : ''}`}
+          style={{ '--c': e.color } as React.CSSProperties}
+          onClick={() => onToggle(e.id)}
+          title={`${e.name} · 30 天 ${fmtTok(e.value)} tok · 点一下${on(e.id) ? '取消' : '只看这家'}`}
+        >
+          <ServiceGlyph id={e.id} size={16} />
+          <span className="nm">{e.name}</span>
+          <b>{fmtTok(e.value)}</b>
+        </button>
+      ))}
+    </div>
+  )
+}
+
 /* ---------- 面积图（平滑曲线 + 渐变 + 悬停读数 + 请求量细条） ---------- */
 export interface Series {
   name: string
@@ -126,10 +180,10 @@ export interface Series {
 }
 
 /* 轴刻度专用格式：整数，或万级缩写。fmtTok 在 <1e4 时原样输出，
-   刻度上会出现 922.32 这种小数，很脏。 */
+   刻度上会出现 922.32 这种小数；而万级再带一位小数会跟相邻的整数刻度
+   （27万 / 18万 / 9.1万）不在一个精度上，读起来脏。所以万级一律取整。 */
 function axisNum(v: number): string {
-  if (v >= 100000) return (v / 10000).toFixed(0) + '万'
-  if (v >= 10000) return (v / 10000).toFixed(1) + '万'
+  if (v >= 10000) return Math.round(v / 10000) + '万'
   return String(Math.round(v))
 }
 
@@ -144,7 +198,8 @@ export function AreaChart({
   onHover,
 }: {
   series: Series[]
-  mode: 'area' | 'split'
+  /** stack：series[0] 在下、series[1] 叠在上面（用于「输入 / 输出」这类同一度量的构成） */
+  mode: 'area' | 'split' | 'stack'
   labels: string[]
   reqData?: number[]
   /** 不传则用 .chartbox 的 CSS 高度（默认 250px）；传 '100%' 可让它撑满弹性容器 */
@@ -160,7 +215,11 @@ export function AreaChart({
   const padB = reqData ? 40 : 22
   const padT = 10
   const n = series[0].data.length
-  const max = Math.max(1, ...series.flatMap((s) => s.data)) * 1.12
+  const stacked = mode === 'stack'
+  const stackTop = (i: number) => (series[0].data[i] ?? 0) + (series[1]?.data[i] ?? 0)
+  const max = (stacked
+    ? Math.max(1, ...series[0].data.map((_, i) => stackTop(i)))
+    : Math.max(1, ...series.flatMap((s) => s.data))) * 1.12
   const x = (i: number) => padL + (i / (n - 1)) * (W - padL)
   const y = (v: number) => padT + (1 - v / max) * (H - padT - padB)
 
@@ -186,7 +245,23 @@ export function AreaChart({
 
   const gid = 'grad-' + series[0].name.replace(/\W/g, '')
   let paths: ReactNode
-  if (mode === 'area') {
+  if (stacked) {
+    /* 输入铺底、输出叠在上面（同一度量的两部分）。这里用**实心两档**而不是渐变：
+       渐变再乘一层透明度会把两层都淡成灰，叠在一起分不出边界，顶线也看不见。
+       填充用本色的低透明度，描边用本色实色 —— 上层那条线就是「总量」的轮廓。 */
+    const base = series[0].data.map((v, i) => [x(i), y(v)] as [number, number])
+    const top = series[0].data.map((_, i) => [x(i), y(stackTop(i))] as [number, number])
+    const under = ` L${W} ${H - padB} L${padL} ${H - padB} Z`
+    const closeBack = ' L' + [...base].reverse().map((p) => `${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(' L')
+    paths = (
+      <>
+        <path d={`${smooth(top)}${closeBack} Z`} fill={series[1].color} fillOpacity={0.3} />
+        <path d={`${smooth(base)}${under}`} fill={series[0].color} fillOpacity={0.42} />
+        <path d={smooth(top)} fill="none" stroke={series[1].color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+        <path d={smooth(base)} fill="none" stroke={series[0].color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+      </>
+    )
+  } else if (mode === 'area') {
     const pts = series[0].data.map((v, i) => [x(i), y(v)] as [number, number])
     const d = smooth(pts)
     paths = (
@@ -231,7 +306,8 @@ export function AreaChart({
     const px = ((e.clientX - r.left) / r.width) * W
     const i = Math.max(0, Math.min(n - 1, Math.round((px - padL) / ((W - padL) / (n - 1)))))
     const vals = series.map((s) => s.data[i])
-    const top = mode === 'split' ? vals[0] : vals.reduce((a, b) => a + b, 0)
+    // 悬停点的纵向位置：堆叠看整摞的高度，分线取第一条，合计取求和
+    const top = stacked ? stackTop(i) : mode === 'split' ? vals[0] : vals.reduce((a, b) => a + b, 0)
     setHover({ i, x: (x(i) / W) * r.width, y: (y(top) / H) * r.height })
   }
 

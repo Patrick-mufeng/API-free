@@ -37,8 +37,8 @@
     font-size: 11.5px; color: #8a8a86; background: #fff; padding: 0 12px;
   }
 
-  /* 服务层 */
-  .svcs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  /* 服务层：五个服务一行 */
+  .svcs { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; }
   .svc {
     border: 1px solid #e7e5e1; border-radius: 8px; padding: 14px 16px;
     display: flex; flex-direction: column; gap: 8px;
@@ -62,7 +62,7 @@
 <body>
   <div class="hd">
     <h1>API-free</h1>
-    <span class="sub">四个免费 AI 反代服务，一个面板统一管理</span>
+    <span class="sub">五个免费 AI 反代服务，一个面板统一管理</span>
   </div>
 
   <div class="panel">
@@ -78,10 +78,10 @@
 
   <div class="wires">
     <svg viewBox="0 0 1496 54" preserveAspectRatio="none">
-      <!-- 主干从面板底部下来，再分到四个服务；横线避开中间的文字标签 -->
+      <!-- 主干从面板底部下来，再分到五个服务；横线避开中间的文字标签 -->
       <path d="M748 0 V9" fill="none" stroke="#d9d5cf" stroke-width="1"/>
-      <path d="M186 30 V9 H1310 V30" fill="none" stroke="#d9d5cf" stroke-width="1"/>
-      <path d="M186 30 V48 M560 30 V48 M936 30 V48 M1310 30 V48" fill="none" stroke="#d9d5cf" stroke-width="1"/>
+      <path d="M143 30 V9 H1353 V30" fill="none" stroke="#d9d5cf" stroke-width="1"/>
+      <path d="M143 30 V48 M446 30 V48 M748 30 V48 M1050 30 V48 M1353 30 V48" fill="none" stroke="#d9d5cf" stroke-width="1"/>
       <path d="M748 9 V30" fill="none" stroke="#d9d5cf" stroke-width="1"/>
       <circle cx="748" cy="9" r="3" fill="#2e64f0"/>
     </svg>
@@ -102,6 +102,12 @@
       <div class="bar"><i style="width:100%;background:#159456"></i></div>
     </div>
     <div class="svc">
+      <div class="top"><span class="dot"></span><span class="nm">Zen-free</span></div>
+      <div class="port">:8020</div>
+      <div class="stack">Go · 无账号池</div>
+      <div class="bar"><i style="width:100%;background:#6b5bd2"></i></div>
+    </div>
+    <div class="svc">
       <div class="top"><span class="dot"></span><span class="nm">Cline-free</span></div>
       <div class="port">:8787</div>
       <div class="stack">Node</div>
@@ -117,7 +123,7 @@
 
   <div class="foot">
     <div><b>对接客户端</b> &nbsp;<span class="mono">127.0.0.1:9000/api/svc/&lt;服务&gt;/v1</span> &nbsp;OpenAI 兼容 · cline 另支持 Anthropic</div>
-    <div><b>不改上游</b> &nbsp;四个服务各自独立演进</div>
+    <div><b>面板只做聚合</b> &nbsp;五个服务各自独立运行</div>
   </div>
 </body>
 </html>
